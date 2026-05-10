@@ -109,7 +109,7 @@ export default function Home() {
 
       <div className="cta">
         <div className="cta-inner">
-          <h2>Sən də mütəxəssissin?</h2>
+          <h2>Sən də mütəxəssissən?</h2>
           <p>Axtar.xyz-də profil aç, elan ver və hər gün yeni müştərilər qazan</p>
           <div className="cta-btns">
             <Link to="/qeydiyyat" className="cta-btn-white">Mütəxəssis kimi qeydiyyat</Link>
