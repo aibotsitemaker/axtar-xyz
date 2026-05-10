@@ -49,12 +49,18 @@ export default function Elanlar() {
 
   const muracietGonder = async () => {
     if (!muracietForm.message.trim()) return
-    const { data: mutexessis } = await supabase.from('mutexessis_hesablari').select('id').eq('user_id', user.id).single()
     await supabase.from('muracietler').insert({
       elan_id: muracietModal.id,
       mutexessis_id: user.id,
       message: muracietForm.message,
       price_offer: parseFloat(muracietForm.price_offer) || null
+    })
+    // Elan sahibinə bildiriş göndər
+    await supabase.from('bildirisler').insert({
+      user_id: muracietModal.user_id,
+      tip: 'muraciet',
+      metn: `"${muracietModal.title}" elanınıza yeni müraciət var`,
+      link: '/dashboard'
     })
     setMuracietGonderilib(true)
   }

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import Bildirisler from './Bildirisler'
 
 export default function Navbar() {
   const [user, setUser] = useState(null)
@@ -49,6 +50,7 @@ export default function Navbar() {
           )}
         </div>
         <div className="navbar-actions">
+          {user && <Bildirisler userId={user.id} />}
           {user ? (
             <>
               <Link to="/dashboard" style={{ fontSize: 14, color: '#555', textDecoration: 'none' }}>{hesab?.full_name?.split(' ')[0] || 'Profilim'}</Link>

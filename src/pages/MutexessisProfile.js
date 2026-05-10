@@ -48,6 +48,13 @@ export default function MutexessisProfile() {
   const mesajGonder = async () => {
     if (!mesaj.trim() || !user) return
     await supabase.from('mesajlar').insert({ sender_id: user.id, receiver_id: mutexessis.hesablar.id, content: mesaj })
+    // Bildiriş göndər
+    await supabase.from('bildirisler').insert({
+      user_id: mutexessis.hesablar.id,
+      tip: 'mesaj',
+      metn: `${hesab?.full_name || 'Biri'} sizə mesaj göndərdi`,
+      link: '/dashboard'
+    })
     setGonderilib(true)
     setMesaj('')
   }
