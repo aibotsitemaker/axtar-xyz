@@ -120,6 +120,11 @@ export default function Home() {
 
       <footer className="footer">
         <div className="footer-logo">Axtar<span style={{ color: '#E24B4A' }}>.</span>xyz</div>
+        <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap', justifyContent: 'center' }}>
+          <Link to="/gizlilik" style={{ fontSize: 13, color: '#888', textDecoration: 'none' }}>Gizlilik Siyasəti</Link>
+          <Link to="/elaqe" style={{ fontSize: 13, color: '#888', textDecoration: 'none' }}>Əlaqə</Link>
+          <Link to="/mutexessisler" style={{ fontSize: 13, color: '#888', textDecoration: 'none' }}>Mütəxəssislər</Link>
+        </div>
         <p style={{ fontSize: 13, color: '#888' }}>© 2025 Axtar.xyz — Bütün hüquqlar qorunur</p>
       </footer>
     </div>
