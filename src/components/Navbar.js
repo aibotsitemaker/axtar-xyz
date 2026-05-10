@@ -43,6 +43,10 @@ export default function Navbar() {
         <div className="navbar-links">
           <Link to="/mutexessisler" style={{ color: isActive('/mutexessisler') ? '#185FA5' : '#555' }}>Mütəxəssislər</Link>
           <Link to="/elanlar" style={{ color: isActive('/elanlar') ? '#185FA5' : '#555' }}>Elanlar</Link>
+          <Link to="/elaqe" style={{ color: isActive('/elaqe') ? '#185FA5' : '#555' }}>Əlaqə</Link>
+          {hesab?.role === 'admin' && (
+            <Link to="/admin" style={{ color: '#E24B4A', fontWeight: 600 }}>⚙️ Admin</Link>
+          )}
         </div>
         <div className="navbar-actions">
           {user ? (
@@ -65,6 +69,8 @@ export default function Navbar() {
       <div className={`navbar-mobile-menu ${menuOpen ? 'open' : ''}`}>
         <Link to="/mutexessisler">Mütəxəssislər</Link>
         <Link to="/elanlar">Elanlar</Link>
+        <Link to="/elaqe">Əlaqə</Link>
+        {hesab?.role === 'admin' && <Link to="/admin" style={{ color: '#E24B4A' }}>⚙️ Admin Panel</Link>}
         {user ? (
           <>
             <Link to="/dashboard">Profilim</Link>
