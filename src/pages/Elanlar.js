@@ -69,11 +69,11 @@ export default function Elanlar() {
     <div className="page-wrap">
       <div style={{ display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:24,flexWrap:'wrap',gap:12 }}>
         <h1 className="page-title" style={{ margin:0 }}>Elanlar</h1>
-        {user && hesab?.role === 'musteri' ? (
+        {user ? (
           <button onClick={() => setShowForm(!showForm)} className="btn-primary" style={{ padding:'10px 20px',fontSize:14 }}>+ Elan ver</button>
-        ) : !user ? (
+        ) : (
           <Link to="/giris" className="btn-primary" style={{ padding:'10px 20px',fontSize:14 }}>Elan üçün daxil ol</Link>
-        ) : null}
+        )}
       </div>
 
       {showForm && (
@@ -121,7 +121,7 @@ export default function Elanlar() {
                   <div style={{ fontSize:13,color:'#888' }}>
                     📍 {e.city}{e.budget && <span style={{ marginLeft:12 }}>💰 {e.budget} AZN</span>}
                   </div>
-                  {user && hesab?.role === 'mutexessis' && (
+                  {user && e.user_id !== user.id && (
                     <button onClick={() => setMuracietModal(e)} className="btn-primary" style={{ fontSize:13 }}>Müraciət et</button>
                   )}
                   {!user && (
