@@ -22,7 +22,7 @@ export default function Admin() {
       yukle()
     }
     yoxla()
-  }, [navigate])
+  }, [])
 
   const yukle = async () => {
     setLoading(true)
@@ -32,7 +32,7 @@ export default function Admin() {
       supabase.from('mutexessis_hesablari').select('*', { count: 'exact', head: true }),
       supabase.from('muracietler').select('*', { count: 'exact', head: true }),
     ])
-    setStats({ istifadeciler: ist, elanlar: elan, mutexessisler: mut, muracietler: murac })
+    setStats({ ist, elan, mut, murac })
     const { data: i } = await supabase.from('hesablar').select('*').order('created_at', { ascending: false })
     setIstifadeciler(i || [])
     const { data: e } = await supabase.from('elanlar').select('*, hesablar(full_name)').order('created_at', { ascending: false })
@@ -43,68 +43,63 @@ export default function Admin() {
   }
 
   const elanSil = async (id) => {
-    if (!window.confirm('Elanı silmək istəyirsiniz?')) return
+    if (!window.confirm('Silmək istəyirsiniz?')) return
     await supabase.from('elanlar').delete().eq('id', id)
-    yukle()
+    setElanlar(p => p.filter(e => e.id !== id))
   }
 
-  const elanStatusDeyis = async (id, field, value) => {
-    await supabase.from('elanlar').update({ [field]: value }).eq('id', id)
-    yukle()
+  const elanUpdate = async (id, data) => {
+    await supabase.from('elanlar').update(data).eq('id', id)
+    setElanlar(p => p.map(e => e.id === id ? { ...e, ...data } : e))
   }
 
-  const mutexessisTesdiq = async (id, value) => {
-    await supabase.from('mutexessis_hesablari').update({ is_verified: value }).eq('id', id)
-    yukle()
+  const mutexessisTesdiq = async (id, val) => {
+    await supabase.from('mutexessis_hesablari').update({ is_verified: val }).eq('id', id)
+    setMutexessisler(p => p.map(m => m.id === id ? { ...m, is_verified: val } : m))
   }
 
-  const istifadeciBloklа = async (id, value) => {
-    await supabase.from('hesablar').update({ is_blocked: value }).eq('id', id)
-    yukle()
+  const bloklа = async (id, val) => {
+    await supabase.from('hesablar').update({ is_blocked: val }).eq('id', id)
+    setIstifadeciler(p => p.map(i => i.id === id ? { ...i, is_blocked: val } : i))
+    setMutexessisler(p => p.map(m => m.user_id === id ? { ...m, hesablar: { ...m.hesablar, is_blocked: val } } : m))
   }
 
-  if (loading) return <div style={{ textAlign: 'center', padding: 80, color: '#888' }}>Yüklənir...</div>
+  if (loading) return <div className="flex items-center justify-center py-24"><div className="w-8 h-8 border-4 border-primary-100 border-t-primary-600 rounded-full animate-spin" /></div>
+
+  const thClass = "px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider"
+  const tdClass = "px-4 py-3 text-sm text-gray-700"
 
   return (
-    <div style={{ minHeight: '100vh', background: '#f8f9fa' }}>
-      {/* Admin header */}
-      <div style={{ background: '#1a1a2e', padding: '16px 32px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <div style={{ color: '#fff', fontWeight: 700, fontSize: 18 }}>⚙️ Admin Panel — Axtar.xyz</div>
-        <button onClick={() => navigate('/')} style={{ background: 'rgba(255,255,255,0.1)', color: '#fff', border: 'none', padding: '7px 16px', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>← Sayta qayıt</button>
+    <div className="min-h-screen bg-gray-900">
+      <div className="bg-gray-800 border-b border-gray-700 px-6 py-4 flex items-center justify-between">
+        <span className="text-white font-bold text-lg">⚙️ Admin Panel — Axtar.xyz</span>
+        <button onClick={() => navigate('/')} className="text-sm text-gray-300 hover:text-white transition-colors">← Sayta qayıt</button>
       </div>
 
-      {/* Tabs */}
-      <div style={{ background: '#fff', borderBottom: '1px solid #eee', padding: '0 32px', display: 'flex', gap: 4 }}>
+      <div className="bg-gray-800 border-b border-gray-700 px-6 flex gap-1">
         {TABS.map(t => (
-          <button key={t} onClick={() => setTab(t)} style={{ padding: '14px 20px', border: 'none', background: 'none', fontSize: 14, cursor: 'pointer', borderBottom: tab === t ? '2px solid #185FA5' : '2px solid transparent', color: tab === t ? '#185FA5' : '#555', fontWeight: tab === t ? 600 : 400 }}>{t}</button>
+          <button key={t} onClick={() => setTab(t)} className={`px-4 py-3 text-sm font-medium transition-colors border-b-2 ${tab === t ? 'text-white border-blue-400' : 'text-gray-400 border-transparent hover:text-gray-200'}`}>{t}</button>
         ))}
       </div>
 
-      <div style={{ padding: '32px', maxWidth: 1200, margin: '0 auto' }}>
-
+      <div className="p-6 max-w-7xl mx-auto">
         {/* Statistika */}
         {tab === 'Statistika' && (
           <div>
-            <h2 style={{ fontSize: 20, fontWeight: 600, marginBottom: 24 }}>Ümumi statistika</h2>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 16, marginBottom: 32 }}>
-              {[
-                ['👥', 'İstifadəçilər', stats.istifadeciler, '#E6F1FB', '#185FA5'],
-                ['📋', 'Elanlar', stats.elanlar, '#EAF3DE', '#2E7D32'],
-                ['🔧', 'Mütəxəssislər', stats.mutexessisler, '#FAEEDA', '#E65100'],
-                ['📨', 'Müraciətlər', stats.muracietler, '#FBEAF0', '#880E4F'],
-              ].map(([ikon, label, val, bg, color]) => (
-                <div key={label} style={{ background: '#fff', border: '1px solid #eee', borderRadius: 12, padding: 24, textAlign: 'center' }}>
-                  <div style={{ fontSize: 32, marginBottom: 8 }}>{ikon}</div>
-                  <div style={{ fontSize: 32, fontWeight: 700, color }}>{val || 0}</div>
-                  <div style={{ fontSize: 13, color: '#888', marginTop: 4 }}>{label}</div>
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+              {[['👥', 'İstifadəçilər', stats.ist, 'text-blue-400'], ['📋', 'Elanlar', stats.elan, 'text-green-400'], ['🔧', 'Mütəxəssislər', stats.mut, 'text-yellow-400'], ['📨', 'Müraciətlər', stats.murac, 'text-purple-400']].map(([ikon, label, val, color]) => (
+                <div key={label} className="bg-gray-800 rounded-2xl p-5 border border-gray-700 text-center">
+                  <div className="text-3xl mb-2">{ikon}</div>
+                  <div className={`text-3xl font-bold ${color}`}>{val || 0}</div>
+                  <div className="text-sm text-gray-400 mt-1">{label}</div>
                 </div>
               ))}
             </div>
-            <div style={{ background: '#fff', border: '1px solid #eee', borderRadius: 12, padding: 24 }}>
-              <h3 style={{ fontSize: 16, fontWeight: 600, marginBottom: 12 }}>Sürətli keçidlər</h3>
-              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+            <div className="bg-gray-800 rounded-2xl p-5 border border-gray-700">
+              <h3 className="text-white font-semibold mb-3">Sürətli keçidlər</h3>
+              <div className="flex gap-3 flex-wrap">
                 {TABS.filter(t => t !== 'Statistika').map(t => (
-                  <button key={t} onClick={() => setTab(t)} style={{ background: '#185FA5', color: '#fff', border: 'none', padding: '9px 20px', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>{t}-ə keç</button>
+                  <button key={t} onClick={() => setTab(t)} className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-medium transition-colors">{t}</button>
                 ))}
               </div>
             </div>
@@ -113,30 +108,28 @@ export default function Admin() {
 
         {/* İstifadəçilər */}
         {tab === 'İstifadəçilər' && (
-          <div>
-            <h2 style={{ fontSize: 20, fontWeight: 600, marginBottom: 24 }}>İstifadəçilər ({istifadeciler.length})</h2>
-            <div style={{ background: '#fff', border: '1px solid #eee', borderRadius: 12, overflow: 'hidden' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                <thead>
-                  <tr style={{ background: '#f8f9fa' }}>
-                    {['Ad', 'Telefon', 'Şəhər', 'Rol', 'Tarix', 'Əməliyyat'].map(h => (
-                      <th key={h} style={{ padding: '12px 16px', fontSize: 13, fontWeight: 600, color: '#555', textAlign: 'left', borderBottom: '1px solid #eee' }}>{h}</th>
-                    ))}
-                  </tr>
+          <div className="bg-gray-800 rounded-2xl border border-gray-700 overflow-hidden">
+            <div className="px-5 py-4 border-b border-gray-700">
+              <h2 className="text-white font-semibold">İstifadəçilər ({istifadeciler.length})</h2>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-gray-750 border-b border-gray-700">
+                  <tr>{['Ad', 'Telefon', 'Şəhər', 'Rol', 'Tarix', 'Əməliyyat'].map(h => <th key={h} className={thClass}>{h}</th>)}</tr>
                 </thead>
-                <tbody>
+                <tbody className="divide-y divide-gray-700">
                   {istifadeciler.map(i => (
-                    <tr key={i.id} style={{ borderBottom: '1px solid #f5f5f5', background: i.is_blocked ? '#FFF5F5' : '#fff' }}>
-                      <td style={{ padding: '12px 16px', fontSize: 13 }}>{i.full_name}</td>
-                      <td style={{ padding: '12px 16px', fontSize: 13, color: '#888' }}>{i.phone || '—'}</td>
-                      <td style={{ padding: '12px 16px', fontSize: 13, color: '#888' }}>{i.city}</td>
-                      <td style={{ padding: '12px 16px' }}>
-                        <span style={{ background: i.role === 'admin' ? '#1a1a2e' : i.role === 'mutexessis' ? '#E6F1FB' : '#EAF3DE', color: i.role === 'admin' ? '#fff' : i.role === 'mutexessis' ? '#185FA5' : '#2E7D32', fontSize: 11, padding: '3px 8px', borderRadius: 20 }}>{i.role}</span>
+                    <tr key={i.id} className={`hover:bg-gray-750 ${i.is_blocked ? 'bg-red-900/20' : ''}`}>
+                      <td className={tdClass + ' text-white font-medium'}>{i.full_name}</td>
+                      <td className={tdClass + ' text-gray-400'}>{i.phone || '—'}</td>
+                      <td className={tdClass + ' text-gray-400'}>{i.city}</td>
+                      <td className={tdClass}>
+                        <span className={`badge text-xs ${i.role === 'admin' ? 'bg-purple-500/20 text-purple-400' : i.role === 'mutexessis' ? 'bg-blue-500/20 text-blue-400' : 'bg-green-500/20 text-green-400'}`}>{i.role}</span>
                       </td>
-                      <td style={{ padding: '12px 16px', fontSize: 12, color: '#aaa' }}>{new Date(i.created_at).toLocaleDateString('az')}</td>
-                      <td style={{ padding: '12px 16px' }}>
+                      <td className={tdClass + ' text-gray-500 text-xs'}>{new Date(i.created_at).toLocaleDateString('az')}</td>
+                      <td className={tdClass}>
                         {i.role !== 'admin' && (
-                          <button onClick={() => istifadeciBloklа(i.id, !i.is_blocked)} style={{ background: i.is_blocked ? '#EAF3DE' : '#FEE', color: i.is_blocked ? '#2E7D32' : '#C00', border: 'none', padding: '5px 12px', borderRadius: 6, fontSize: 12, cursor: 'pointer' }}>
+                          <button onClick={() => bloklа(i.id, !i.is_blocked)} className={`text-xs px-3 py-1.5 rounded-lg font-medium transition-colors ${i.is_blocked ? 'bg-green-500/20 text-green-400 hover:bg-green-500/30' : 'bg-red-500/20 text-red-400 hover:bg-red-500/30'}`}>
                             {i.is_blocked ? 'Bloku aç' : 'Blokla'}
                           </button>
                         )}
@@ -151,36 +144,33 @@ export default function Admin() {
 
         {/* Elanlar */}
         {tab === 'Elanlar' && (
-          <div>
-            <h2 style={{ fontSize: 20, fontWeight: 600, marginBottom: 24 }}>Elanlar ({elanlar.length})</h2>
-            <div style={{ background: '#fff', border: '1px solid #eee', borderRadius: 12, overflow: 'hidden' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                <thead>
-                  <tr style={{ background: '#f8f9fa' }}>
-                    {['Başlıq', 'Kateqoriya', 'Sahibi', 'Status', 'VIP', 'Öndə', 'Əməliyyat'].map(h => (
-                      <th key={h} style={{ padding: '12px 16px', fontSize: 13, fontWeight: 600, color: '#555', textAlign: 'left', borderBottom: '1px solid #eee' }}>{h}</th>
-                    ))}
-                  </tr>
+          <div className="bg-gray-800 rounded-2xl border border-gray-700 overflow-hidden">
+            <div className="px-5 py-4 border-b border-gray-700">
+              <h2 className="text-white font-semibold">Elanlar ({elanlar.length})</h2>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="border-b border-gray-700">
+                  <tr>{['Başlıq', 'Kateqoriya', 'Sahibi', 'VIP', 'Öndə', 'Sil'].map(h => <th key={h} className={thClass}>{h}</th>)}</tr>
                 </thead>
-                <tbody>
+                <tbody className="divide-y divide-gray-700">
                   {elanlar.map(e => (
-                    <tr key={e.id} style={{ borderBottom: '1px solid #f5f5f5' }}>
-                      <td style={{ padding: '12px 16px', fontSize: 13, maxWidth: 200 }}>{e.title}</td>
-                      <td style={{ padding: '12px 16px' }}><span style={{ background: '#E6F1FB', color: '#185FA5', fontSize: 11, padding: '3px 8px', borderRadius: 20 }}>{e.category}</span></td>
-                      <td style={{ padding: '12px 16px', fontSize: 13, color: '#888' }}>{e.hesablar?.full_name}</td>
-                      <td style={{ padding: '12px 16px' }}><span style={{ background: e.status === 'aktiv' ? '#EAF3DE' : '#FEE', color: e.status === 'aktiv' ? '#2E7D32' : '#C00', fontSize: 11, padding: '3px 8px', borderRadius: 20 }}>{e.status}</span></td>
-                      <td style={{ padding: '12px 16px' }}>
-                        <button onClick={() => elanStatusDeyis(e.id, 'is_vip', !e.is_vip)} style={{ background: e.is_vip ? '#FAEEDA' : '#f5f5f5', color: e.is_vip ? '#E65100' : '#888', border: 'none', padding: '4px 10px', borderRadius: 6, fontSize: 12, cursor: 'pointer' }}>
+                    <tr key={e.id} className="hover:bg-gray-750">
+                      <td className={tdClass + ' text-white max-w-xs truncate'}>{e.title}</td>
+                      <td className={tdClass}><span className="badge bg-blue-500/20 text-blue-400 text-xs">{e.category}</span></td>
+                      <td className={tdClass + ' text-gray-400'}>{e.hesablar?.full_name}</td>
+                      <td className={tdClass}>
+                        <button onClick={() => elanUpdate(e.id, { is_vip: !e.is_vip })} className={`text-xs px-3 py-1.5 rounded-lg font-medium transition-colors ${e.is_vip ? 'bg-yellow-500/20 text-yellow-400' : 'bg-gray-700 text-gray-400 hover:bg-gray-600'}`}>
                           {e.is_vip ? '⭐ VIP' : 'VIP et'}
                         </button>
                       </td>
-                      <td style={{ padding: '12px 16px' }}>
-                        <button onClick={() => elanStatusDeyis(e.id, 'is_featured', !e.is_featured)} style={{ background: e.is_featured ? '#E6F1FB' : '#f5f5f5', color: e.is_featured ? '#185FA5' : '#888', border: 'none', padding: '4px 10px', borderRadius: 6, fontSize: 12, cursor: 'pointer' }}>
+                      <td className={tdClass}>
+                        <button onClick={() => elanUpdate(e.id, { is_featured: !e.is_featured })} className={`text-xs px-3 py-1.5 rounded-lg font-medium transition-colors ${e.is_featured ? 'bg-blue-500/20 text-blue-400' : 'bg-gray-700 text-gray-400 hover:bg-gray-600'}`}>
                           {e.is_featured ? '🔝 Öndə' : 'Öndə çıxar'}
                         </button>
                       </td>
-                      <td style={{ padding: '12px 16px' }}>
-                        <button onClick={() => elanSil(e.id)} style={{ background: '#FEE', color: '#C00', border: 'none', padding: '5px 12px', borderRadius: 6, fontSize: 12, cursor: 'pointer' }}>Sil</button>
+                      <td className={tdClass}>
+                        <button onClick={() => elanSil(e.id)} className="text-xs px-3 py-1.5 rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500/30 transition-colors">Sil</button>
                       </td>
                     </tr>
                   ))}
@@ -192,36 +182,36 @@ export default function Admin() {
 
         {/* Mütəxəssislər */}
         {tab === 'Mütəxəssislər' && (
-          <div>
-            <h2 style={{ fontSize: 20, fontWeight: 600, marginBottom: 24 }}>Mütəxəssislər ({mutexessisler.length})</h2>
-            <div style={{ background: '#fff', border: '1px solid #eee', borderRadius: 12, overflow: 'hidden' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                <thead>
-                  <tr style={{ background: '#f8f9fa' }}>
-                    {['Ad', 'Kateqoriya', 'Şəhər', 'Reytinq', 'Status', 'Əməliyyat'].map(h => (
-                      <th key={h} style={{ padding: '12px 16px', fontSize: 13, fontWeight: 600, color: '#555', textAlign: 'left', borderBottom: '1px solid #eee' }}>{h}</th>
-                    ))}
-                  </tr>
+          <div className="bg-gray-800 rounded-2xl border border-gray-700 overflow-hidden">
+            <div className="px-5 py-4 border-b border-gray-700">
+              <h2 className="text-white font-semibold">Mütəxəssislər ({mutexessisler.length})</h2>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="border-b border-gray-700">
+                  <tr>{['Ad', 'Kateqoriya', 'Şəhər', 'Reytinq', 'Status', 'Əməliyyat'].map(h => <th key={h} className={thClass}>{h}</th>)}</tr>
                 </thead>
-                <tbody>
+                <tbody className="divide-y divide-gray-700">
                   {mutexessisler.map(m => (
-                    <tr key={m.id} style={{ borderBottom: '1px solid #f5f5f5', background: m.hesablar?.is_blocked ? '#FFF5F5' : '#fff' }}>
-                      <td style={{ padding: '12px 16px', fontSize: 13 }}>{m.hesablar?.full_name}</td>
-                      <td style={{ padding: '12px 16px' }}><span style={{ background: '#E6F1FB', color: '#185FA5', fontSize: 11, padding: '3px 8px', borderRadius: 20 }}>{m.category}</span></td>
-                      <td style={{ padding: '12px 16px', fontSize: 13, color: '#888' }}>{m.hesablar?.city}</td>
-                      <td style={{ padding: '12px 16px', fontSize: 13 }}>{'★'.repeat(Math.round(m.rating || 0))} {m.rating?.toFixed(1)}</td>
-                      <td style={{ padding: '12px 16px' }}>
-                        <span style={{ background: m.is_verified ? '#EAF3DE' : '#FEE', color: m.is_verified ? '#2E7D32' : '#C00', fontSize: 11, padding: '3px 8px', borderRadius: 20 }}>
+                    <tr key={m.id} className={`hover:bg-gray-750 ${m.hesablar?.is_blocked ? 'bg-red-900/20' : ''}`}>
+                      <td className={tdClass + ' text-white font-medium'}>{m.hesablar?.full_name}</td>
+                      <td className={tdClass}><span className="badge bg-blue-500/20 text-blue-400 text-xs">{m.category}</span></td>
+                      <td className={tdClass + ' text-gray-400'}>{m.hesablar?.city}</td>
+                      <td className={tdClass + ' text-yellow-400'}>{'★'.repeat(Math.round(m.rating || 0))} {m.rating?.toFixed(1)}</td>
+                      <td className={tdClass}>
+                        <span className={`badge text-xs ${m.is_verified ? 'bg-green-500/20 text-green-400' : 'bg-yellow-500/20 text-yellow-400'}`}>
                           {m.is_verified ? '✅ Təsdiqlənib' : '⏳ Gözləyir'}
                         </span>
                       </td>
-                      <td style={{ padding: '12px 16px', display: 'flex', gap: 6 }}>
-                        <button onClick={() => mutexessisTesdiq(m.id, !m.is_verified)} style={{ background: m.is_verified ? '#FEE' : '#EAF3DE', color: m.is_verified ? '#C00' : '#2E7D32', border: 'none', padding: '5px 10px', borderRadius: 6, fontSize: 12, cursor: 'pointer' }}>
-                          {m.is_verified ? 'Təsdiqi ləğv et' : 'Təsdiqlə'}
-                        </button>
-                        <button onClick={() => istifadeciBloklа(m.user_id, !m.hesablar?.is_blocked)} style={{ background: m.hesablar?.is_blocked ? '#EAF3DE' : '#FEE', color: m.hesablar?.is_blocked ? '#2E7D32' : '#C00', border: 'none', padding: '5px 10px', borderRadius: 6, fontSize: 12, cursor: 'pointer' }}>
-                          {m.hesablar?.is_blocked ? 'Bloku aç' : 'Blokla'}
-                        </button>
+                      <td className={tdClass}>
+                        <div className="flex gap-2">
+                          <button onClick={() => mutexessisTesdiq(m.id, !m.is_verified)} className={`text-xs px-3 py-1.5 rounded-lg font-medium transition-colors ${m.is_verified ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30' : 'bg-green-500/20 text-green-400 hover:bg-green-500/30'}`}>
+                            {m.is_verified ? 'Ləğv et' : 'Təsdiqlə'}
+                          </button>
+                          <button onClick={() => bloklа(m.user_id, !m.hesablar?.is_blocked)} className={`text-xs px-3 py-1.5 rounded-lg font-medium transition-colors ${m.hesablar?.is_blocked ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
+                            {m.hesablar?.is_blocked ? 'Bloku aç' : 'Blokla'}
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}

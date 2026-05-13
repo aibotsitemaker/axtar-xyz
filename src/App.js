@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { BrowserRouter, Routes, Route, useNavigate } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, useNavigate, useLocation } from 'react-router-dom'
 import { supabase } from './lib/supabase'
 import Navbar from './components/Navbar'
 import Home from './pages/Home'
@@ -9,18 +9,17 @@ import Mutexessisler from './pages/Mutexessisler'
 import MutexessisProfile from './pages/MutexessisProfile'
 import Elanlar from './pages/Elanlar'
 import Dashboard from './pages/Dashboard'
-import Gizlilik from './pages/Gizlilik'
-import Elaqe from './pages/Elaqe'
 import Admin from './pages/Admin'
+import { Gizlilik, Elaqe } from './pages/StatikSehifeler'
 
-function AuthHandler() {
+function GoogleAuthHandler() {
   const navigate = useNavigate()
+  const location = useLocation()
 
   useEffect(() => {
-    // Google OAuth-dan sonra token-i işlə
-    supabase.auth.onAuthStateChange(async (event, session) => {
-      if (event === 'SIGNED_IN' && session) {
-        // Hesab var mı yoxla, yoxdursa yarat
+    if (!location.hash.includes('access_token')) return
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      if (session?.user) {
         const { data: hesab } = await supabase.from('hesablar').select('id').eq('id', session.user.id).single()
         if (!hesab) {
           await supabase.from('hesablar').insert({
@@ -30,44 +29,45 @@ function AuthHandler() {
             role: 'musteri'
           })
         }
-        // Hash-də token varsa dashboard-a yönləndir
-        if (window.location.hash.includes('access_token')) {
-          navigate('/dashboard')
-        }
+        navigate('/dashboard', { replace: true })
       }
     })
-  }, [navigate])
+  }, [])
 
   return null
 }
 
-function App() {
+function MainLayout() {
+  return (
+    <>
+      <GoogleAuthHandler />
+      <Navbar />
+      <main>
+        <Routes>
+          <Route path="/" element={<Home />} />
+          <Route path="/giris" element={<Giris />} />
+          <Route path="/qeydiyyat" element={<Qeydiyyat />} />
+          <Route path="/mutexessisler" element={<Mutexessisler />} />
+          <Route path="/mutexessis/:id" element={<MutexessisProfile />} />
+          <Route path="/elanlar" element={<Elanlar />} />
+          <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/gizlilik" element={<Gizlilik />} />
+          <Route path="/elaqe" element={<Elaqe />} />
+        </Routes>
+      </main>
+    </>
+  )
+}
+
+export default function App() {
   return (
     <BrowserRouter>
-      <AuthHandler />
-      <div style={{ minHeight: '100vh', background: '#f8f9fa', fontFamily: "'Inter', sans-serif" }}>
+      <div className="min-h-screen bg-gray-50 font-sans">
         <Routes>
           <Route path="/admin" element={<Admin />} />
-          <Route path="*" element={
-            <>
-              <Navbar />
-              <Routes>
-                <Route path="/" element={<Home />} />
-                <Route path="/giris" element={<Giris />} />
-                <Route path="/qeydiyyat" element={<Qeydiyyat />} />
-                <Route path="/mutexessisler" element={<Mutexessisler />} />
-                <Route path="/mutexessis/:id" element={<MutexessisProfile />} />
-                <Route path="/elanlar" element={<Elanlar />} />
-                <Route path="/dashboard" element={<Dashboard />} />
-                <Route path="/gizlilik" element={<Gizlilik />} />
-                <Route path="/elaqe" element={<Elaqe />} />
-              </Routes>
-            </>
-          } />
+          <Route path="/*" element={<MainLayout />} />
         </Routes>
       </div>
     </BrowserRouter>
   )
 }
-
-export default App
