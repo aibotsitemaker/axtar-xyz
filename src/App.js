@@ -9,6 +9,7 @@ import Mutexessisler from './pages/Mutexessisler'
 import MutexessisProfile from './pages/MutexessisProfile'
 import Elanlar from './pages/Elanlar'
 import Dashboard from './pages/Dashboard'
+import ProfilRedakte from './pages/ProfilRedakte'
 import Admin from './pages/Admin'
 import { Gizlilik, Elaqe } from './pages/StatikSehifeler'
 
@@ -51,6 +52,7 @@ function MainLayout() {
           <Route path="/mutexessis/:id" element={<MutexessisProfile />} />
           <Route path="/elanlar" element={<Elanlar />} />
           <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/profil/redakte" element={<ProfilRedakte />} />
           <Route path="/gizlilik" element={<Gizlilik />} />
           <Route path="/elaqe" element={<Elaqe />} />
         </Routes>

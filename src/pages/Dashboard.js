@@ -78,7 +78,7 @@ export default function Dashboard() {
                   </div>
                 ))}
               </div>
-              <Link to={`/mutexessis/${mutexessis.id}`} className="btn-primary w-full justify-center mt-4">Profilə bax</Link>
+              <div className="flex gap-2 mt-4"><Link to={`/mutexessis/${mutexessis.id}`} className="btn-primary flex-1 justify-center">Profilə bax</Link><Link to="/profil/redakte" className="btn-secondary flex-1 justify-center">✎ Redaktə</Link></div>
             </div>
           )}
 
@@ -142,7 +142,7 @@ export default function Dashboard() {
 
           {/* Hesab məlumatları */}
           <div className="card p-5">
-            <h2 className="font-semibold text-gray-800 mb-4">Hesab məlumatları</h2>
+            <div className="flex items-center justify-between mb-4"><h2 className="font-semibold text-gray-800">Hesab məlumatları</h2><Link to="/profil/redakte" className="btn-secondary text-xs py-1.5 px-3">✎ Redaktə</Link></div>
             <div className="space-y-2">
               {[['Ad', hesab?.full_name], ['Telefon', hesab?.phone || '—'], ['Şəhər', hesab?.city || '—']].map(([l, v]) => (
                 <div key={l} className="flex justify-between py-2 border-b border-gray-50 last:border-0">
