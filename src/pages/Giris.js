@@ -6,40 +6,35 @@ export default function Giris() {
   const [form, setForm] = useState({ email: '', sifre: '' })
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [showPass, setShowPass] = useState(false)
 
   const daxilOl = async () => {
-    if (!form.email || !form.sifre) { setError('E-poçt və şifrəni daxil edin'); return }
-    setLoading(true)
-    setError('')
-
+    if (!form.email.trim()) { setError('E-poçt ünvanını daxil edin'); return }
+    if (!form.sifre) { setError('Şifrəni daxil edin'); return }
+    setLoading(true); setError('')
     try {
       const { data, error: authError } = await supabase.auth.signInWithPassword({
-        email: form.email.trim(),
+        email: form.email.trim().toLowerCase(),
         password: form.sifre
       })
       if (authError) {
-        setError('E-poçt və ya şifrə yanlışdır')
-        setLoading(false)
-        return
+        if (authError.message.includes('Invalid login')) setError('E-poçt və ya şifrə yanlışdır')
+        else if (authError.message.includes('Email not confirmed')) setError('E-poçtunuzu təsdiqləyin')
+        else setError('Giriş xətası. Yenidən cəhd edin.')
+        setLoading(false); return
       }
-      if (data?.user) {
-        window.location.href = '/dashboard'
-      }
-    } catch (e) {
-      setError('Xəta baş verdi. Yenidən cəhd edin.')
+      if (data?.user) window.location.href = '/dashboard'
+    } catch {
+      setError('Şəbəkə xətası. İnternet bağlantınızı yoxlayın.')
       setLoading(false)
     }
   }
 
   const googleIleGiris = async () => {
-    try {
-      await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: { redirectTo: 'https://www.axtar.xyz/dashboard' }
-      })
-    } catch (e) {
-      setError('Google ilə giriş xətası baş verdi')
-    }
+    await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: { redirectTo: 'https://www.axtar.xyz/dashboard' }
+    })
   }
 
   return (
@@ -64,40 +59,29 @@ export default function Giris() {
           <div className="space-y-4 mb-5">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5">E-poçt</label>
-              <input
-                className="input"
-                type="email"
-                placeholder="email@mail.com"
-                value={form.email}
-                onChange={e => setForm(p => ({ ...p, email: e.target.value }))}
-                disabled={loading}
-              />
+              <input className="input" type="email" placeholder="email@mail.com" value={form.email}
+                onChange={e => setForm(p => ({ ...p, email: e.target.value }))} disabled={loading} autoComplete="email" />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">Şifrə</label>
-              <input
-                className="input"
-                type="password"
-                placeholder="••••••••"
-                value={form.sifre}
-                onChange={e => setForm(p => ({ ...p, sifre: e.target.value }))}
-                onKeyDown={e => e.key === 'Enter' && !loading && daxilOl()}
-                disabled={loading}
-              />
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="text-sm font-medium text-gray-700">Şifrə</label>
+                <Link to="/sifre-sifirla" className="text-xs text-primary-600 hover:underline">Unutdunuz?</Link>
+              </div>
+              <div className="relative">
+                <input className="input pr-10" type={showPass ? 'text' : 'password'} placeholder="••••••••"
+                  value={form.sifre} onChange={e => setForm(p => ({ ...p, sifre: e.target.value }))}
+                  onKeyDown={e => e.key === 'Enter' && !loading && daxilOl()} disabled={loading} autoComplete="current-password" />
+                <button type="button" onClick={() => setShowPass(p => !p)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-sm">
+                  {showPass ? '🙈' : '👁️'}
+                </button>
+              </div>
             </div>
           </div>
 
-          <button
-            onClick={daxilOl}
-            disabled={loading}
-            className="w-full bg-primary-600 hover:bg-primary-700 disabled:bg-primary-300 text-white font-semibold py-3 rounded-xl transition-colors text-sm flex items-center justify-center gap-2"
-          >
-            {loading ? (
-              <>
-                <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                Giriş edilir...
-              </>
-            ) : 'Daxil ol'}
+          <button onClick={daxilOl} disabled={loading}
+            className="w-full bg-primary-600 hover:bg-primary-700 disabled:bg-primary-300 text-white font-semibold py-3 rounded-xl transition-colors text-sm flex items-center justify-center gap-2">
+            {loading ? <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Giriş edilir...</> : 'Daxil ol'}
           </button>
 
           <div className="flex items-center gap-3 my-4">
@@ -106,11 +90,8 @@ export default function Giris() {
             <div className="flex-1 h-px bg-gray-100" />
           </div>
 
-          <button
-            onClick={googleIleGiris}
-            disabled={loading}
-            className="w-full flex items-center justify-center gap-3 px-4 py-3 border border-gray-200 rounded-xl hover:bg-gray-50 disabled:opacity-50 transition-colors text-sm font-medium text-gray-700"
-          >
+          <button onClick={googleIleGiris} disabled={loading}
+            className="w-full flex items-center justify-center gap-3 px-4 py-3 border border-gray-200 rounded-xl hover:bg-gray-50 disabled:opacity-50 transition-colors text-sm font-medium text-gray-700">
             <svg width="18" height="18" viewBox="0 0 24 24">
               <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
               <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
@@ -122,8 +103,7 @@ export default function Giris() {
         </div>
 
         <p className="text-center text-sm text-gray-500 mt-4">
-          Hesabınız yoxdur?{' '}
-          <Link to="/qeydiyyat" className="text-primary-600 font-medium hover:underline">Qeydiyyat</Link>
+          Hesabınız yoxdur? <Link to="/qeydiyyat" className="text-primary-600 font-medium hover:underline">Qeydiyyat</Link>
         </p>
       </div>
     </div>
