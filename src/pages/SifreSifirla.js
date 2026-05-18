@@ -12,7 +12,7 @@ export default function SifreSifirla() {
     if (!email.trim()) { setError('E-poçt ünvanını daxil edin'); return }
     setLoading(true); setError('')
     const { error: err } = await supabase.auth.resetPasswordForEmail(email.trim(), {
-      redirectTo: 'https://www.axtar.xyz/profil/redakte'
+      redirectTo: 'https://www.axtar.xyz/sifre-yenile'
     })
     if (err) { setError('Xəta baş verdi. E-poçtu yoxlayın.'); setLoading(false); return }
     setGonderilib(true)
