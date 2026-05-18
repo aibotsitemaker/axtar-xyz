@@ -15,6 +15,7 @@ import ProfilRedakte from './pages/ProfilRedakte'
 import Admin from './pages/Admin'
 import NotFound from './pages/NotFound'
 import { Gizlilik, Elaqe } from './pages/StatikSehifeler'
+import SifreYenile from './pages/SifreYenile'
 
 function GoogleAuthHandler() {
   const navigate = useNavigate()
@@ -56,6 +57,7 @@ function MainLayout() {
           <Route path="/elanlar" element={<Elanlar />} />
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/profil/redakte" element={<ProfilRedakte />} />
+          <Route path="/sifre-yenile" element={<SifreYenile />} />
           <Route path="/gizlilik" element={<Gizlilik />} />
           <Route path="/elaqe" element={<Elaqe />} />
           <Route path="*" element={<NotFound />} />
