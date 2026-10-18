@@ -3,6 +3,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '../../lib/supabase';
 import { useAuth, LoginPrompt } from '../../components/AuthProvider';
+import { safeUrl } from '../../lib/safe';
 
 export default function ProfilePage() {
   const { user, loading } = useAuth();
@@ -114,7 +115,7 @@ export default function ProfilePage() {
                   <p className="text-xs text-slate-400">{f.item_type === 'book' ? `${Number(it.price).toFixed(2)} ₼ · ${it.city}` : `${it.level} · ${it.subject}`}</p>
                 </div>
                 <div className="flex shrink-0 gap-2">
-                  {f.item_type === 'pdf' && <a href={it.file_url} target="_blank" rel="noopener noreferrer" className="btn btn-ghost !px-3 !py-1.5">Aç</a>}
+                  {f.item_type === 'pdf' && <a href={safeUrl(it.file_url) || '#'} target="_blank" rel="noopener noreferrer" className="btn btn-ghost !px-3 !py-1.5">Aç</a>}
                   <button onClick={() => unfav(f.id)} className="btn btn-ghost !px-3 !py-1.5">❤️</button>
                 </div>
               </div>

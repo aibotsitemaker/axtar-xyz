@@ -40,6 +40,13 @@ export default function AuthPage() {
     }
   }
 
+  async function forgot() {
+    setMsg({ type: '', text: '' });
+    if (!email) return setMsg({ type: 'err', text: 'Əvvəlcə e-poçt ünvanınızı yazın.' });
+    const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: `${window.location.origin}/auth/reset` });
+    setMsg(error ? { type: 'err', text: error.message } : { type: 'ok', text: 'Parol bərpası linki e-poçtunuza göndərildi.' });
+  }
+
   return (
     <div className="mx-auto max-w-md">
       <div className="card p-6 md:p-8">
@@ -63,6 +70,9 @@ export default function AuthPage() {
             <label className="label">Parol</label>
             <input type="password" className="input" required value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" />
           </div>
+          {mode === 'login' && (
+            <button type="button" onClick={forgot} className="text-xs text-brand hover:underline">Şifrəni unutdum</button>
+          )}
           {mode === 'register' && (
             <label className="flex items-start gap-2 text-xs text-slate-500">
               <input type="checkbox" className="mt-0.5" checked={agree} onChange={(e) => setAgree(e.target.checked)} />

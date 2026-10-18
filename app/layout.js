@@ -2,18 +2,28 @@ import './globals.css';
 import Script from 'next/script';
 import { AuthProvider } from '../components/AuthProvider';
 import Shell from '../components/Shell';
+import { SITE_URL, SITE_NAME } from '../lib/site';
+
+const DESCRIPTION = 'İkinci əl kitab bazarı, PDF arxivi, onlayn sınaqlar və tələbələr üçün canlı çat platforması.';
 
 export const metadata = {
-  title: 'TəhsilHub — Kitab, PDF, Sınaq və Canlı Çat',
-  description: 'İkinci əl kitab bazarı, PDF arxivi, onlayn sınaqlar və tələbələr üçün canlı çat platforması.'
+  metadataBase: new URL(SITE_URL),
+  title: { default: `${SITE_NAME} — Kitab, PDF, Sınaq və Canlı Çat`, template: `%s | ${SITE_NAME}` },
+  description: DESCRIPTION,
+  alternates: { canonical: '/' },
+  openGraph: { type: 'website', locale: 'az_AZ', siteName: SITE_NAME, title: `${SITE_NAME} — Kitab, PDF, Sınaq və Canlı Çat`, description: DESCRIPTION, url: SITE_URL },
+  twitter: { card: 'summary', title: SITE_NAME, description: DESCRIPTION }
 };
 export const viewport = { width: 'device-width', initialScale: 1, themeColor: '#10B981' };
+
+const jsonLd = { '@context': 'https://schema.org', '@type': 'WebSite', name: SITE_NAME, url: SITE_URL, inLanguage: 'az' };
 
 export default function RootLayout({ children }) {
   const ad = process.env.NEXT_PUBLIC_ADSENSE_CLIENT;
   return (
     <html lang="az">
       <body>
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
         {ad ? (
           <Script async strategy="afterInteractive" crossOrigin="anonymous"
             src={`https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${ad}`} />

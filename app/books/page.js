@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../components/AuthProvider';
 import AdSlot from '../../components/AdSlot';
+import { safeUrl, validateFile } from '../../lib/safe';
 
 const CATS = ['DİM', 'Magistr', 'IELTS', 'Universitet', 'Digər'];
 const CONDS = ['Yeni kimi', 'Yaxşı', 'Orta', 'Köhnə'];
@@ -80,6 +81,10 @@ export default function BooksPage() {
     try {
       let urls = [];
       if (file) {
+        const bad = validateFile(file, ['image/jpeg', 'image/png', 'image/webp'], 5);
+        if (bad) throw new Error(bad);
+      }
+      if (file) {
         const path = `${user.id}/${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.]/g, '_')}`;
         const { error: ue } = await supabase.storage.from('book-images').upload(path, file);
         if (ue) throw ue;
@@ -154,8 +159,8 @@ export default function BooksPage() {
             <div key={b.id} className="contents">
               <article className="card overflow-hidden">
                 <div className="relative aspect-[4/3] bg-slate-100">
-                  {b.image_urls?.[0]
-                    ? <img src={b.image_urls[0]} alt={b.title} className="h-full w-full object-cover" loading="lazy" />
+                  {safeUrl(b.image_urls?.[0])
+                    ? <img src={safeUrl(b.image_urls[0])} alt={b.title} className="h-full w-full object-cover" loading="lazy" />
                     : <div className="grid h-full place-items-center text-4xl">📖</div>}
                   <button onClick={() => toggleFav(b.id)} aria-label="Favori"
                     className="absolute right-3 top-3 grid h-9 w-9 place-items-center rounded-full bg-white/90 text-lg shadow">

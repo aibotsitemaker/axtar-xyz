@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../components/AuthProvider';
 import AdSlot from '../../components/AdSlot';
+import { safeUrl, validateFile } from '../../lib/safe';
 
 const LEVELS = ['Orta məktəb', 'DİM', 'Bakalavr', 'Magistr', 'IELTS', 'Digər'];
 const THIS_YEAR = new Date().getFullYear();
@@ -66,20 +67,25 @@ export default function PdfsPage() {
   function view(p) {
     supabase.rpc('increment_pdf_view', { p_pdf_id: p.id });
     bump(p.id, 'view_count');
-    window.open(p.file_url, '_blank');
+    const u = safeUrl(p.file_url);
+    if (u) window.open(u, '_blank', 'noopener');
   }
 
   function download(p) {
     supabase.rpc('increment_pdf_download', { p_pdf_id: p.id });
     bump(p.id, 'download_count');
     const a = document.createElement('a');
-    a.href = p.file_url; a.target = '_blank'; a.rel = 'noopener'; a.download = `${p.title}.pdf`;
+    const u = safeUrl(p.file_url);
+    if (!u) return;
+    a.href = u; a.target = '_blank'; a.rel = 'noopener'; a.download = `${p.title}.pdf`;
     document.body.appendChild(a); a.click(); a.remove();
   }
 
   async function submit(e) {
     e.preventDefault();
     if (!file) return setMsg('PDF faylı seçin.');
+    const bad = validateFile(file, ['application/pdf'], 30);
+    if (bad) return setMsg(bad);
     setSaving(true);
     setMsg('');
     try {
