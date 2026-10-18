@@ -1,14 +1,15 @@
 /** @type {import('tailwindcss').Config} */
 module.exports = {
-  content: ["./src/**/*.{js,jsx,ts,tsx}"],
+  content: ['./app/**/*.{js,jsx}', './components/**/*.{js,jsx}'],
   theme: {
     extend: {
       colors: {
-        primary: { 50: '#E6F1FB', 100: '#B5D4F4', 500: '#378ADD', 600: '#185FA5', 700: '#0C447C' },
-        accent: { 500: '#E24B4A' },
+        brand: { DEFAULT: '#10B981', hover: '#059669' },
+        ink: '#1E293B',
+        canvas: '#F8FAFC'
       },
-      fontFamily: { sans: ['Inter', 'sans-serif'] },
-    },
+      fontFamily: { sans: ['-apple-system', 'BlinkMacSystemFont', 'Inter', 'Segoe UI', 'Roboto', 'sans-serif'] }
+    }
   },
-  plugins: [],
-}
+  plugins: []
+};
