@@ -21,7 +21,7 @@ export default function AuthPage() {
     try {
       if (mode === 'register') {
         if (!agree) throw new Error('Davam etmək üçün şərtlərlə razılaşmalısınız.');
-        if (password.length < 6) throw new Error('Parol ən azı 6 simvol olmalıdır.');
+        if (password.length < 8) throw new Error('Parol ən azı 8 simvol olmalıdır.');
         const { data, error } = await supabase.auth.signUp({
           email, password, options: { data: { full_name: name } }
         });

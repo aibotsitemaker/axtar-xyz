@@ -19,7 +19,7 @@ export default function ProfilePage() {
   const load = useCallback(async () => {
     if (!user) return;
     const [p, b, f, d] = await Promise.all([
-      supabase.from('profiles').select('*').eq('id', user.id).single(),
+      supabase.from('profiles').select('id, full_name, username, avatar_url, city, bio, created_at').eq('id', user.id).single(),
       supabase.from('books').select('*').eq('seller_id', user.id).order('created_at', { ascending: false }),
       supabase.from('favorites').select('*, books(*), pdfs(*)').eq('user_id', user.id).order('created_at', { ascending: false }),
       supabase.from('pdfs').select('*').eq('uploader_id', user.id).order('created_at', { ascending: false })
@@ -43,6 +43,20 @@ export default function ProfilePage() {
   async function delBook(id) { if (confirm('Elan silinsin?')) { await supabase.from('books').delete().eq('id', id); load(); } }
   async function delPdf(id) { if (confirm('PDF silinsin?')) { await supabase.from('pdfs').delete().eq('id', id); load(); } }
   async function unfav(id) { await supabase.from('favorites').delete().eq('id', id); load(); }
+  async function delAccount() {
+    const w = window.prompt('Hesab, elanlar, PDF-lər, favorilər və mesajlar birdəfəlik silinəcək. Təsdiq üçün SİL yazın:');
+    if (!w || !/^s[iİı]l$/i.test(w.trim())) return;
+    try {
+      for (const bucket of ['book-images', 'pdf-files', 'avatars']) {
+        const { data: files } = await supabase.storage.from(bucket).list(user.id);
+        if (files && files.length) await supabase.storage.from(bucket).remove(files.map((f) => `${user.id}/${f.name}`));
+      }
+    } catch (e) { /* fayl təmizliyi alınmasa da hesab silinməsi davam edir */ }
+    const { error } = await supabase.rpc('delete_my_account');
+    if (error) return setMsg(error.message);
+    await supabase.auth.signOut({ scope: 'local' });
+    router.push('/');
+  }
   async function logout() { await supabase.auth.signOut(); router.push('/'); }
 
   if (loading) return <p className="py-16 text-center text-slate-400">Yüklənir...</p>;
@@ -132,6 +146,14 @@ export default function ProfilePage() {
           {msg && <p className="text-sm text-emerald-700">{msg}</p>}
           <button className="btn btn-primary">Yadda saxla</button>
         </form>
+      )}
+
+      {tab === 'settings' && (
+        <div className="card mt-6 max-w-lg border-red-200 p-5">
+          <h2 className="font-semibold text-red-600">Hesabı sil</h2>
+          <p className="mt-1 text-sm text-slate-500">Hesabınız, elanlarınız, PDF-ləriniz, favorilər və mesajlarınız birdəfəlik silinir. Bu əməliyyat geri qaytarıla bilməz.</p>
+          <button onClick={delAccount} className="btn btn-danger mt-4">Hesabımı birdəfəlik sil</button>
+        </div>
       )}
     </div>
   );

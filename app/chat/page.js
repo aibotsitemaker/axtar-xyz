@@ -13,6 +13,7 @@ function ChatInner() {
   const [active, setActive] = useState(paramId);
   const [msgs, setMsgs] = useState([]);
   const [text, setText] = useState('');
+  const [err, setErr] = useState('');
   const endRef = useRef(null);
 
   useEffect(() => { if (paramId) setActive(paramId); }, [paramId]);
@@ -61,9 +62,10 @@ function ChatInner() {
     const content = text.trim();
     if (!content || !active) return;
     setText('');
+    setErr('');
     const { data, error } = await supabase.from('chat_messages')
       .insert({ conversation_id: active, sender_id: user.id, content }).select().single();
-    if (error) { setText(content); return; }
+    if (error) { setText(content); setErr(error.message || 'Mesaj göndərilmədi.'); return; }
     setMsgs((m) => (m.some((x) => x.id === data.id) ? m : [...m, data]));
   }
 
@@ -119,6 +121,7 @@ function ChatInner() {
               })}
               <div ref={endRef} />
             </div>
+            {err && <div className="bg-red-50 px-4 py-2 text-xs text-red-600">{err}</div>}
             <form onSubmit={send} className="flex gap-2 border-t border-slate-200 bg-white p-3">
               <input className="input" placeholder="Mesaj yazın..." value={text} maxLength={2000} onChange={(e) => setText(e.target.value)} />
               <button className="btn btn-primary" disabled={!text.trim()}>Göndər</button>

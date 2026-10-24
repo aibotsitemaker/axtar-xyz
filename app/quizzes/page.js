@@ -11,13 +11,18 @@ function Engine({ quiz, user, onExit }) {
   const [qs, setQs] = useState([]);
   const [i, setI] = useState(0);
   const [picked, setPicked] = useState(null);
+  const [fb, setFb] = useState(null);
+  const [checking, setChecking] = useState(false);
   const [answers, setAnswers] = useState([]);
   const [left, setLeft] = useState(quiz.duration_seconds);
   const [done, setDone] = useState(false);
+  const [err, setErr] = useState('');
+  const [saveState, setSaveState] = useState('');
   const saved = useRef(false);
 
   useEffect(() => {
-    supabase.from('quiz_questions').select('*').eq('quiz_id', quiz.id).order('position')
+    supabase.from('quiz_questions').select('id, quiz_id, position, question_text, options')
+      .eq('quiz_id', quiz.id).order('position')
       .then(({ data }) => setQs(data || []));
   }, [quiz.id]);
 
@@ -33,24 +38,39 @@ function Engine({ quiz, user, onExit }) {
   const percent = qs.length ? Math.round((correct * 100) / qs.length) : 0;
 
   useEffect(() => {
-    if (done && !saved.current && user && qs.length) {
-      saved.current = true;
-      supabase.from('quiz_attempts').insert({
-        quiz_id: quiz.id, user_id: user.id, correct_count: correct, total_questions: qs.length,
-        score_percent: percent, seconds_used: quiz.duration_seconds - Math.max(left, 0), answers
-      }).then(() => {});
-    }
+    if (!done || saved.current || !user || qs.length === 0) return;
+    saved.current = true;
+    setSaveState('saving');
+    supabase.rpc('submit_quiz_attempt', {
+      p_quiz_id: quiz.id,
+      p_answers: answers.map((a) => ({ q: a.q, picked: a.picked })),
+      p_seconds: quiz.duration_seconds - Math.max(left, 0)
+    }).then(({ error }) => setSaveState(error ? 'error' : 'ok'));
+    // Yalnız test bitəndə bir dəfə işləməlidir (answers/left həmin anda sabitdir).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [done]);
 
-  function pick(idx) {
-    if (picked !== null || done) return;
+  async function pick(idx) {
+    if (picked !== null || checking || done) return;
+    setChecking(true);
+    setErr('');
+    const { data, error } = await supabase.rpc('check_answer', { p_question_id: qs[i].id, p_picked: idx });
+    setChecking(false);
+    const r = data && data[0];
+    if (error || !r) { setErr('Cavab yoxlanıla bilmədi. Bağlantınızı yoxlayıb yenidən cəhd edin.'); return; }
     setPicked(idx);
-    setAnswers((a) => [...a, { q: qs[i].id, picked: idx, ok: idx === qs[i].correct_index }]);
+    setFb(r);
+    setAnswers((a) => [...a, { q: qs[i].id, picked: idx, ok: r.r_correct }]);
   }
 
   function next() {
     if (i + 1 >= qs.length) setDone(true);
-    else { setI(i + 1); setPicked(null); }
+    else { setI(i + 1); setPicked(null); setFb(null); }
+  }
+
+  function restart() {
+    setI(0); setPicked(null); setFb(null); setAnswers([]); setErr('');
+    setLeft(quiz.duration_seconds); setSaveState(''); saved.current = false; setDone(false);
   }
 
   if (qs.length === 0) return <p className="py-16 text-center text-slate-400">Suallar yüklənir...</p>;
@@ -66,9 +86,11 @@ function Engine({ quiz, user, onExit }) {
           <div className="rounded-xl bg-slate-100 p-3"><div className="text-xl font-bold">{fmt(quiz.duration_seconds - left)}</div>Vaxt</div>
         </div>
         {!user && <p className="mt-4 text-xs text-slate-400">Nəticələrinizin saxlanması üçün daxil olun.</p>}
+        {user && saveState === 'ok' && <p className="mt-4 text-xs text-emerald-600">Nəticə kabinetinizdə saxlanıldı.</p>}
+        {user && saveState === 'error' && <p className="mt-4 text-xs text-red-500">Nəticə saxlanmadı (limit və ya bağlantı problemi).</p>}
         <div className="mt-6 flex justify-center gap-3">
           <button className="btn btn-ghost" onClick={onExit}>Sınaqlar</button>
-          <button className="btn btn-primary" onClick={() => { setI(0); setPicked(null); setAnswers([]); setLeft(quiz.duration_seconds); saved.current = false; setDone(false); }}>Yenidən başla</button>
+          <button className="btn btn-primary" onClick={restart}>Yenidən başla</button>
         </div>
       </div>
     );
@@ -90,13 +112,13 @@ function Engine({ quiz, user, onExit }) {
         <div className="mt-5 space-y-3">
           {cur.options.map((opt, idx) => {
             let cls = 'border-slate-200 bg-white hover:border-brand';
-            if (picked !== null) {
-              if (idx === cur.correct_index) cls = 'border-emerald-500 bg-emerald-50 text-emerald-800';
+            if (picked !== null && fb) {
+              if (idx === fb.r_index) cls = 'border-emerald-500 bg-emerald-50 text-emerald-800';
               else if (idx === picked) cls = 'border-red-400 bg-red-50 text-red-700';
               else cls = 'border-slate-200 bg-white opacity-60';
             }
             return (
-              <button key={idx} onClick={() => pick(idx)} disabled={picked !== null}
+              <button key={idx} onClick={() => pick(idx)} disabled={picked !== null || checking}
                 className={`flex w-full items-center gap-3 rounded-xl border-2 px-4 py-3 text-left text-sm font-medium transition ${cls}`}>
                 <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-slate-100 text-xs font-bold text-slate-600">{String.fromCharCode(65 + idx)}</span>
                 {opt}
@@ -104,12 +126,13 @@ function Engine({ quiz, user, onExit }) {
             );
           })}
         </div>
-        {picked !== null && (
+        {err && <p className="mt-4 text-sm text-red-600">{err}</p>}
+        {picked !== null && fb && (
           <div className="mt-5">
-            <p className={`text-sm font-semibold ${picked === cur.correct_index ? 'text-emerald-600' : 'text-red-600'}`}>
-              {picked === cur.correct_index ? '✓ Düzgün!' : '✗ Səhv cavab'}
+            <p className={`text-sm font-semibold ${fb.r_correct ? 'text-emerald-600' : 'text-red-600'}`}>
+              {fb.r_correct ? '✓ Düzgün!' : '✗ Səhv cavab'}
             </p>
-            {cur.explanation && <p className="mt-1 text-sm text-slate-500">{cur.explanation}</p>}
+            {fb.r_explanation && <p className="mt-1 text-sm text-slate-500">{fb.r_explanation}</p>}
             <button onClick={next} className="btn btn-primary mt-4 w-full">{i + 1 >= qs.length ? 'Nəticəni gör' : 'Növbəti sual'}</button>
           </div>
         )}

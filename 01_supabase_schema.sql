@@ -272,7 +272,7 @@ security definer
 set search_path = public
 as $$
 begin
-    if new.role is distinct from old.role and not public.is_admin() then
+    if new.role is distinct from old.role and auth.uid() is not null and not public.is_admin() then
         new.role = old.role;
     end if;
     return new;
@@ -509,7 +509,7 @@ create policy "legal_admin_delete" on public.privacy_policy_terms
 -- ---------------------------------------------------------------------
 -- 10. REALTIME PUBLICATION
 -- ---------------------------------------------------------------------
-alter table public.chat_messages replicate identity full;
+alter table public.chat_messages replica identity full;
 
 do $$
 begin

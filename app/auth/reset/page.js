@@ -11,7 +11,7 @@ export default function ResetPage() {
 
   async function submit(e) {
     e.preventDefault();
-    if (password.length < 6) return setMsg({ type: 'err', text: 'Parol ən azı 6 simvol olmalıdır.' });
+    if (password.length < 8) return setMsg({ type: 'err', text: 'Parol ən azı 8 simvol olmalıdır.' });
     setBusy(true);
     const { error } = await supabase.auth.updateUser({ password });
     setBusy(false);
@@ -28,7 +28,7 @@ export default function ResetPage() {
         <form onSubmit={submit} className="mt-6 space-y-4">
           <div>
             <label className="label">Yeni parol</label>
-            <input type="password" className="input" required minLength={6} value={password} onChange={(e) => setPassword(e.target.value)} />
+            <input type="password" className="input" required minLength={8} value={password} onChange={(e) => setPassword(e.target.value)} />
           </div>
           {msg.text && <div className={`rounded-xl px-3 py-2 text-sm ${msg.type === 'ok' ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-600'}`}>{msg.text}</div>}
           <button disabled={busy} className="btn btn-primary w-full">{busy ? 'Gözləyin...' : 'Parolu yenilə'}</button>
