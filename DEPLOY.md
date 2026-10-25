@@ -18,7 +18,7 @@ Production sayta və real verilənlər bazasına toxunmazdan əvvəl 1–3-cü a
 
 ## 2. Əvvəlcə test mühitində yoxlayın (tövsiyə olunur)
 Real məlumata toxunmadan sınamaq üçün ikinci pulsuz Supabase layihəsi yaradın (məs. `tehsilhub-test`):
-1. SQL Editor-da ardıcıl işlədin: `01_supabase_schema.sql` → `02_hardening_phase1.sql` → `03_hardening_phase2.sql`.
+1. SQL Editor-da ardıcıl işlədin: `01_supabase_schema.sql` → `02_hardening_phase1.sql` → `04_grants.sql` → `03_hardening_phase2.sql`.
 2. Vercel-də repo-dan yeni branch (`v3`) üçün Preview yerləşdirmə yaradın və Preview mühit dəyişənlərinə test layihənin URL və anon key-ni yazın.
 3. Preview linkində yoxlama siyahısı (aşağıda, 6-cı bölmə) edin. Yalnız bundan sonra production-a keçin.
 
@@ -27,7 +27,8 @@ Real məlumata toxunmadan sınamaq üçün ikinci pulsuz Supabase layihəsi yara
    - Hamı cədvəl `true` olmalıdır.
    - 3-cü cədvəl (https olmayan ünvanlar) boş olmalıdır. Sətir varsa mənə göndərin, 02-ni işlətməyin.
 2. `02_hardening_phase1.sql` işlədin. Bu mərhələ köhnə (v2) saytı pozmur, məlumat silmir və dəyişmir. Xəta olarsa avtomatik geri qayıdır.
-3. **Hələ 03-ü işlətməyin.**
+3. `04_grants.sql` işlədin. **Yeni Supabase layihələrində (30 may 2026-dan sonra yaradılmış) bu mütləqdir:** Supabase cədvəllərə avtomatik icazə vermir və bu fayl olmadan sayt "permission denied for table ..." xətası verir (PDF yükləmə, elan, favori və s. işləmir). Yalnız icazə əlavə edir, məlumata toxunmur, təkrar işlədilə bilər.
+4. **Hələ 03-ü işlətməyin.**
 
 ## 4. Production saytı yeniləmək
 1. Zip-in məzmununu repoya köçürün (`node_modules`, `.next`, `.env*` repoda olmamalıdır) və push edin.
@@ -58,7 +59,7 @@ Qeydiyyatdan sonra SQL Editor-da: `update public.profiles set role='admin' where
 
 ## 8. Geri qayıtmaq
 - Sayt: Vercel → Deployments → əvvəlki yerləşdirmə → Promote to Production.
-- Verilənlər bazası: `99_rollback.sql` işlədin. Elan, PDF, mesaj, nəticə kimi istifadəçi məlumatına toxunmur. Yalnız yeni əlavə olunan köməkçi cədvəl/sütun silinir.
+- Verilənlər bazası: `99_rollback.sql` işlədin (04-ün icazələri qalır, zərərsizdir). Elan, PDF, mesaj, nəticə kimi istifadəçi məlumatına toxunmur. Yalnız yeni əlavə olunan köməkçi cədvəl/sütun silinir.
 - Silinmiş istifadəçi hesabları geri qaytarılmır (yalnız Supabase ehtiyat nüsxəsindən).
 
 ## 9. AdSense (real məlumatlar olanda)

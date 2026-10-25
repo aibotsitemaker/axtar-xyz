@@ -2,6 +2,8 @@
 -- TƏHSİL HUB — SUPABASE TAM SQL SXEMİ
 -- Supabase Dashboard > SQL Editor > New query > yapışdır > Run
 -- Təmiz layihədə bir dəfə işlədin.
+-- DİQQƏT: 30 may 2026-dan sonra yaradılan Supabase layihələrində bundan sonra 02 və 04_grants.sql da işlədilməlidir,
+-- yoxsa sayt "permission denied for table" xətası verir.
 -- =====================================================================
 
 -- ---------------------------------------------------------------------
