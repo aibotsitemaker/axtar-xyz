@@ -108,4 +108,24 @@ ok('order 04 -> 02 -> 03: RPCs and RLS helper functions still executable', (awai
 await q(d2, A, 'authenticated', `insert into pdfs(uploader_id,title,level,subject,file_url) values ('${A}','Konspekt 2','DİM','Riyaziyyat','https://x.co/a.pdf')`);
 ok('order 04 -> 02 -> 03: upload still works', (await val(d2, `select count(*)::int c from pdfs`))[0].c === 1);
 
+
+// 7) Profili olmayan istifadəçi (trigger qurulmamışdan əvvəl qeydiyyat) -> 05 bərpası
+{
+  const d3 = await fresh();
+  await d3.exec(`drop trigger on_auth_user_created on auth.users`);
+  await seed(d3);
+  ok('PRE-05: users created while trigger missing have no profile', (await val(d3, `select count(*)::int c from profiles`))[0].c === 0);
+  await d3.exec(sql('04_grants.sql'));
+  await expectFail('PRE-05: PDF insert fails with pdfs_uploader_id_fkey (the user-reported error)', d3, A, 'authenticated', `insert into pdfs(uploader_id,title,level,subject,file_url) values ('${A}','Konspekt','DİM','Riyaziyyat','https://x.co/k.pdf')`, /pdfs_uploader_id_fkey/);
+  const r5 = await d3.exec(sql('05_backfill_profiles.sql')); await d3.exec(sql('05_backfill_profiles.sql'));
+  ok('05 runs twice; final check query returns 0 users without profile', r5[r5.length - 1].rows[0].profilsiz_istifadeci === 0 || Number(r5[r5.length - 1].rows[0].profilsiz_istifadeci) === 0);
+  ok('05 creates profiles with name from signup metadata', (await val(d3, `select full_name from profiles where id='${A}'`))[0].full_name === 'User A');
+  await q(d3, A, 'authenticated', `insert into pdfs(uploader_id,title,level,subject,file_url) values ('${A}','Konspekt','DİM','Riyaziyyat','https://x.co/k.pdf')`);
+  ok('AFTER 05: PDF upload record succeeds', (await val(d3, `select count(*)::int c from pdfs`))[0].c === 1);
+  await d3.exec(`insert into auth.users(id,email,raw_user_meta_data) values ('c0000000-0000-0000-0000-00000000000c','C@t.az','{}'::jsonb)`);
+  ok('AFTER 05: new signups get a profile via the (re)created trigger', (await val(d3, `select count(*)::int c from profiles`))[0].c === 3);
+  await d3.exec(`update profiles set full_name='Edited' where id='${A}'`); await d3.exec(sql('05_backfill_profiles.sql'));
+  ok('05 never overwrites existing profiles', (await val(d3, `select full_name from profiles where id='${A}'`))[0].full_name === 'Edited');
+}
+
 console.log(log.join('\n')); console.log(`\nTOTAL: ${pass} passed, ${fail} failed`); process.exit(fail ? 1 : 0);

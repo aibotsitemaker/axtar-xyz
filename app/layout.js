@@ -15,7 +15,7 @@ export const metadata = {
   twitter: { card: 'summary', title: SITE_NAME, description: DESCRIPTION },
   ...(ADSENSE_CLIENT ? { other: { 'google-adsense-account': ADSENSE_CLIENT } } : {})
 };
-export const viewport = { width: 'device-width', initialScale: 1, themeColor: '#10B981' };
+export const viewport = { width: 'device-width', initialScale: 1, themeColor: '#2563EB' };
 
 const jsonLd = { '@context': 'https://schema.org', '@type': 'WebSite', name: SITE_NAME, url: SITE_URL, inLanguage: 'az' };
 

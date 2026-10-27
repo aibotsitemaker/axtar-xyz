@@ -16,7 +16,7 @@ function Markdown({ source }) {
   let list = [];
   const flush = (k) => {
     if (list.length) {
-      out.push(<ul key={`ul-${k}`} className="my-3 list-disc space-y-1 pl-6 text-slate-600">{list.map((t, i) => <li key={i}>{inline(t)}</li>)}</ul>);
+      out.push(<ul key={`ul-${k}`} className="my-3 list-disc space-y-1.5 pl-6 text-ink/80">{list.map((t, i) => <li key={i}>{inline(t)}</li>)}</ul>);
       list = [];
     }
   };
@@ -25,9 +25,9 @@ function Markdown({ source }) {
     if (line.startsWith('- ')) { list.push(line.slice(2)); return; }
     flush(idx);
     if (!line) return;
-    if (line.startsWith('## ')) out.push(<h2 key={idx} className="mb-2 mt-8 text-lg font-semibold">{line.slice(3)}</h2>);
-    else if (line.startsWith('# ')) out.push(<h1 key={idx} className="mb-4 text-3xl font-bold tracking-tight">{line.slice(2)}</h1>);
-    else out.push(<p key={idx} className="my-2 leading-relaxed text-slate-600">{inline(line)}</p>);
+    if (line.startsWith('## ')) out.push(<h2 key={idx} className="mb-2 mt-9 text-xl font-semibold">{line.slice(3)}</h2>);
+    else if (line.startsWith('# ')) out.push(<h1 key={idx} className="mb-4 text-3xl font-bold tracking-tight sm:text-4xl">{line.slice(2)}</h1>);
+    else out.push(<p key={idx} className="my-2 leading-relaxed text-ink/80">{inline(line)}</p>);
   });
   flush('end');
   return <>{out}</>;
@@ -45,19 +45,19 @@ export default function LegalView({ type }) {
 
   return (
     <div className="mx-auto max-w-3xl">
-      <div className="card p-6 md:p-10">
-        {state === 'loading' && <p className="text-slate-400">Yüklənir...</p>}
-        {state === 'missing' && <p className="text-slate-500">Sənəd tapılmadı.</p>}
+      <div className="card p-6 sm:p-10">
+        {state === 'loading' && <div className="space-y-3" aria-busy="true"><div className="skeleton h-9 w-2/3" /><div className="skeleton h-4 w-full" /><div className="skeleton h-4 w-5/6" /><div className="skeleton h-4 w-4/6" /></div>}
+        {state === 'missing' && <p className="text-muted">Sənəd tapılmadı.</p>}
         {state === 'ok' && (
           <>
             <Markdown source={doc.content} />
-            <p className="mt-8 border-t border-slate-100 pt-4 text-xs text-slate-400">Versiya {doc.version} · Qüvvəyə minmə: {doc.effective_date}</p>
+            <p className="mt-9 border-t border-line pt-4 text-xs text-muted">Versiya {doc.version} · Qüvvəyə minmə: {doc.effective_date}</p>
           </>
         )}
       </div>
-      <div className="mt-4 flex justify-center gap-5 text-sm text-slate-500">
-        <Link href="/legal/privacy" className="hover:text-ink">Məxfilik Siyasəti</Link>
-        <Link href="/legal/terms" className="hover:text-ink">İstifadə Şərtləri</Link>
+      <div className="mt-5 flex justify-center gap-6 text-sm text-muted">
+        <Link href="/legal/privacy" className="hover:text-primary">Məxfilik Siyasəti</Link>
+        <Link href="/legal/terms" className="hover:text-primary">İstifadə Şərtləri</Link>
       </div>
     </div>
   );

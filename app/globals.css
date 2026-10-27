@@ -2,16 +2,60 @@
 @tailwind components;
 @tailwind utilities;
 
-html { -webkit-tap-highlight-color: transparent; }
-body { @apply bg-canvas text-ink antialiased; }
+/* ---- Dizayn tokenləri (rənglər burada dəyişdirilir; RGB kanalları) ---- */
+@layer base {
+  :root {
+    --primary: 37 99 235;        /* #2563EB */
+    --primary-hover: 29 78 216;  /* #1D4ED8 */
+    --primary-soft: 239 246 255; /* #EFF6FF */
+    --canvas: 248 250 252;       /* #F8FAFC */
+    --surface: 255 255 255;      /* #FFFFFF */
+    --ink: 15 23 42;             /* #0F172A */
+    --muted: 100 116 139;        /* #64748B */
+    --line: 226 232 240;         /* #E2E8F0 */
+    --success: 22 163 74;        /* #16A34A */
+    --success-soft: 240 253 244;
+    --danger: 220 38 38;         /* #DC2626 */
+    --danger-soft: 254 242 242;
+    --warning: 217 119 6;        /* #D97706 */
+    --warning-soft: 255 251 235;
+  }
+  html { -webkit-tap-highlight-color: transparent; scroll-behavior: smooth; }
+  body { @apply bg-canvas text-ink antialiased; }
+  h1, h2, h3 { letter-spacing: -0.01em; }
+  :focus-visible { outline: 2px solid rgb(var(--primary)); outline-offset: 2px; }
+  ::selection { background: rgb(var(--primary) / 0.18); }
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+    *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+  }
+}
 
+/* ---- Ortaq komponent sinifləri ---- */
 @layer components {
-  .btn { @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed; }
-  .btn-primary { @apply bg-brand text-white shadow-sm hover:bg-brand-hover; }
-  .btn-ghost { @apply bg-white text-ink border border-slate-200 hover:bg-slate-50; }
-  .btn-danger { @apply bg-white text-red-600 border border-red-200 hover:bg-red-50; }
-  .card { @apply rounded-2xl bg-white border border-slate-200/70 shadow-sm; }
-  .input { @apply w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm outline-none transition focus:border-brand focus:ring-4 focus:ring-brand/15; }
-  .chip { @apply inline-flex items-center rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-medium text-emerald-700; }
-  .label { @apply mb-1 block text-xs font-medium text-slate-500; }
+  .btn { @apply inline-flex h-10 select-none items-center justify-center gap-2 whitespace-nowrap rounded-lg px-4 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50; }
+  .btn-sm { @apply h-9 px-3; }
+  .btn-lg { @apply h-11 px-5 text-base; }
+  .btn-primary { @apply bg-primary text-white hover:bg-primary-hover; }
+  .btn-secondary { @apply border border-line bg-surface text-ink hover:bg-canvas; }
+  .btn-ghost { @apply text-muted hover:bg-primary-soft hover:text-primary; }
+  .btn-danger { @apply border border-danger/30 bg-surface text-danger hover:bg-danger-soft; }
+
+  .card { @apply rounded-xl border border-line bg-surface shadow-card; }
+  .input { @apply h-10 w-full rounded-lg border border-line bg-surface px-3 text-sm text-ink transition placeholder:text-muted/70 focus:border-primary focus:outline-none focus:ring-4 focus:ring-primary/15; }
+  textarea.input { @apply h-auto py-2.5; }
+  .label { @apply mb-1.5 block text-sm font-medium text-ink; }
+  .hint { @apply mt-1 text-xs text-muted; }
+
+  .badge { @apply inline-flex items-center gap-1 rounded-full bg-primary-soft px-2.5 py-0.5 text-xs font-medium text-primary; }
+  .badge-muted { @apply border border-line bg-canvas text-muted; }
+
+  .alert { @apply flex items-start gap-2 rounded-lg border px-3.5 py-2.5 text-sm; }
+  .alert-info { @apply border-primary/20 bg-primary-soft text-primary-hover; }
+  .alert-success { @apply border-success/25 bg-success-soft text-success; }
+  .alert-error { @apply border-danger/25 bg-danger-soft text-danger; }
+  .alert-warning { @apply border-warning/25 bg-warning-soft text-warning; }
+
+  .container-page { @apply mx-auto w-full max-w-6xl px-4 sm:px-6; }
+  .skeleton { @apply animate-pulse rounded-lg bg-line/70; }
 }

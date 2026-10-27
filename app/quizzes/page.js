@@ -3,9 +3,26 @@ import { useEffect, useRef, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../components/AuthProvider';
 import AdSlot from '../../components/AdSlot';
+import Icon from '../../components/Icons';
+import { Alert, EmptyState, PageHeader, Spinner } from '../../components/ui';
 
 const CATS = ['', 'DİM', 'Magistr', 'IELTS', 'Universitet', 'Digər'];
 const fmt = (s) => `${String(Math.floor(Math.max(s, 0) / 60)).padStart(2, '0')}:${String(Math.max(s, 0) % 60).padStart(2, '0')}`;
+
+function Ring({ percent }) {
+  const r = 52;
+  const c = 2 * Math.PI * r;
+  return (
+    <div className="relative mx-auto h-36 w-36" role="img" aria-label={`Nəticə: ${percent} faiz`}>
+      <svg viewBox="0 0 120 120" className="h-full w-full -rotate-90">
+        <circle cx="60" cy="60" r={r} fill="none" stroke="rgb(var(--line))" strokeWidth="10" />
+        <circle cx="60" cy="60" r={r} fill="none" stroke="rgb(var(--primary))" strokeWidth="10" strokeLinecap="round"
+          strokeDasharray={c} strokeDashoffset={c - (c * percent) / 100} />
+      </svg>
+      <div className="absolute inset-0 grid place-items-center text-3xl font-bold">{percent}%</div>
+    </div>
+  );
+}
 
 function Engine({ quiz, user, onExit }) {
   const [qs, setQs] = useState([]);
@@ -73,24 +90,30 @@ function Engine({ quiz, user, onExit }) {
     setLeft(quiz.duration_seconds); setSaveState(''); saved.current = false; setDone(false);
   }
 
-  if (qs.length === 0) return <p className="py-16 text-center text-slate-400">Suallar yüklənir...</p>;
+  if (qs.length === 0) {
+    return <div className="mx-auto max-w-2xl space-y-3" aria-busy="true"><div className="skeleton h-10" /><div className="skeleton h-64" /></div>;
+  }
 
   if (done) {
     return (
-      <div className="card mx-auto max-w-lg p-8 text-center">
-        <div className="mx-auto grid h-28 w-28 place-items-center rounded-full border-8 border-brand text-3xl font-bold text-brand">{percent}%</div>
-        <h2 className="mt-5 text-xl font-bold">{percent >= 70 ? 'Əla nəticə!' : percent >= 40 ? 'Yaxşı cəhd!' : 'Təkrar çalışın!'}</h2>
-        <div className="mt-4 grid grid-cols-3 gap-3 text-sm">
-          <div className="rounded-xl bg-emerald-50 p-3"><div className="text-xl font-bold text-emerald-700">{correct}</div>Düzgün</div>
-          <div className="rounded-xl bg-red-50 p-3"><div className="text-xl font-bold text-red-600">{qs.length - correct}</div>Səhv</div>
-          <div className="rounded-xl bg-slate-100 p-3"><div className="text-xl font-bold">{fmt(quiz.duration_seconds - left)}</div>Vaxt</div>
+      <div className="card mx-auto max-w-lg p-6 text-center sm:p-8">
+        <Ring percent={percent} />
+        <h1 className="mt-5 text-2xl font-bold tracking-tight">{percent >= 70 ? 'Əla nəticə!' : percent >= 40 ? 'Yaxşı cəhd!' : 'Təkrar çalışın!'}</h1>
+        <p className="mt-1 text-sm text-muted">{quiz.title}</p>
+        <div className="mt-6 grid grid-cols-3 gap-3 text-sm">
+          <div className="rounded-lg bg-success-soft p-3"><div className="text-xl font-bold text-success">{correct}</div><div className="text-muted">Düzgün</div></div>
+          <div className="rounded-lg bg-danger-soft p-3"><div className="text-xl font-bold text-danger">{qs.length - correct}</div><div className="text-muted">Səhv</div></div>
+          <div className="rounded-lg bg-canvas p-3"><div className="text-xl font-bold">{fmt(quiz.duration_seconds - left)}</div><div className="text-muted">Vaxt</div></div>
         </div>
-        {!user && <p className="mt-4 text-xs text-slate-400">Nəticələrinizin saxlanması üçün daxil olun.</p>}
-        {user && saveState === 'ok' && <p className="mt-4 text-xs text-emerald-600">Nəticə kabinetinizdə saxlanıldı.</p>}
-        {user && saveState === 'error' && <p className="mt-4 text-xs text-red-500">Nəticə saxlanmadı (limit və ya bağlantı problemi).</p>}
+        <div className="mt-5 space-y-2">
+          {!user && <Alert type="info" className="text-left">Nəticələrinizin saxlanması üçün daxil olun.</Alert>}
+          {user && saveState === 'saving' && <p className="flex items-center justify-center gap-2 text-xs text-muted"><Spinner />Nəticə saxlanılır...</p>}
+          {user && saveState === 'ok' && <Alert type="success" className="text-left">Nəticə kabinetinizdə saxlanıldı.</Alert>}
+          {user && saveState === 'error' && <Alert type="error" className="text-left">Nəticə saxlanmadı (limit və ya bağlantı problemi).</Alert>}
+        </div>
         <div className="mt-6 flex justify-center gap-3">
-          <button className="btn btn-ghost" onClick={onExit}>Sınaqlar</button>
-          <button className="btn btn-primary" onClick={restart}>Yenidən başla</button>
+          <button className="btn btn-secondary" onClick={onExit}>Sınaqlar</button>
+          <button className="btn btn-primary" onClick={restart}><Icon name="rotate" className="h-4 w-4" />Yenidən başla</button>
         </div>
       </div>
     );
@@ -99,41 +122,46 @@ function Engine({ quiz, user, onExit }) {
   const cur = qs[i];
   return (
     <div className="mx-auto max-w-2xl">
-      <div className="mb-4 flex items-center justify-between">
-        <button onClick={onExit} className="text-sm text-slate-500 hover:text-ink">← Çıx</button>
-        <span className={`rounded-full px-3 py-1 text-sm font-semibold ${left < 30 ? 'bg-red-50 text-red-600' : 'bg-emerald-50 text-emerald-700'}`}>⏱ {fmt(left)}</span>
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <button onClick={onExit} className="inline-flex items-center gap-1.5 text-sm font-medium text-muted hover:text-ink"><Icon name="arrowLeft" className="h-4 w-4" />Çıx</button>
+        <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-sm font-semibold ${left < 30 ? 'bg-danger-soft text-danger' : 'bg-primary-soft text-primary'}`}>
+          <Icon name="clock" className="h-4 w-4" />{fmt(left)}
+        </span>
       </div>
-      <div className="mb-5 h-2 overflow-hidden rounded-full bg-slate-200">
-        <div className="h-full rounded-full bg-brand transition-all" style={{ width: `${((i + (picked !== null ? 1 : 0)) / qs.length) * 100}%` }} />
+      <div className="mb-5" role="progressbar" aria-valuemin={0} aria-valuemax={qs.length} aria-valuenow={i + (picked !== null ? 1 : 0)} aria-label="Sınaq irəliləyişi">
+        <div className="h-2 overflow-hidden rounded-full bg-line"><div className="h-full rounded-full bg-primary transition-all" style={{ width: `${((i + (picked !== null ? 1 : 0)) / qs.length) * 100}%` }} /></div>
       </div>
-      <div className="card p-5 md:p-7">
-        <p className="text-xs font-medium text-slate-400">Sual {i + 1} / {qs.length}</p>
-        <h2 className="mt-2 text-lg font-semibold">{cur.question_text}</h2>
-        <div className="mt-5 space-y-3">
+      <div className="card p-5 sm:p-7">
+        <p className="text-xs font-semibold uppercase tracking-wide text-primary">Sual {i + 1} / {qs.length}</p>
+        <h1 className="mt-2 text-lg font-semibold leading-snug sm:text-xl">{cur.question_text}</h1>
+        <div className="mt-5 space-y-3" role="group" aria-label="Cavab variantları">
           {cur.options.map((opt, idx) => {
-            let cls = 'border-slate-200 bg-white hover:border-brand';
+            let cls = 'border-line bg-surface hover:border-primary hover:bg-primary-soft/50';
+            let badge = 'bg-canvas text-muted';
             if (picked !== null && fb) {
-              if (idx === fb.r_index) cls = 'border-emerald-500 bg-emerald-50 text-emerald-800';
-              else if (idx === picked) cls = 'border-red-400 bg-red-50 text-red-700';
-              else cls = 'border-slate-200 bg-white opacity-60';
+              if (idx === fb.r_index) { cls = 'border-success bg-success-soft text-ink'; badge = 'bg-success text-white'; }
+              else if (idx === picked) { cls = 'border-danger bg-danger-soft text-ink'; badge = 'bg-danger text-white'; }
+              else { cls = 'border-line bg-surface opacity-60'; }
             }
             return (
               <button key={idx} onClick={() => pick(idx)} disabled={picked !== null || checking}
-                className={`flex w-full items-center gap-3 rounded-xl border-2 px-4 py-3 text-left text-sm font-medium transition ${cls}`}>
-                <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-slate-100 text-xs font-bold text-slate-600">{String.fromCharCode(65 + idx)}</span>
-                {opt}
+                className={`flex min-h-12 w-full items-center gap-3 rounded-lg border-2 px-4 py-3 text-left text-sm font-medium transition-colors sm:text-base ${cls}`}>
+                <span className={`grid h-7 w-7 shrink-0 place-items-center rounded-full text-xs font-bold ${badge}`}>{String.fromCharCode(65 + idx)}</span>
+                <span className="min-w-0 flex-1 break-words">{opt}</span>
               </button>
             );
           })}
         </div>
-        {err && <p className="mt-4 text-sm text-red-600">{err}</p>}
+        {err && <Alert type="error" className="mt-4">{err}</Alert>}
         {picked !== null && fb && (
           <div className="mt-5">
-            <p className={`text-sm font-semibold ${fb.r_correct ? 'text-emerald-600' : 'text-red-600'}`}>
-              {fb.r_correct ? '✓ Düzgün!' : '✗ Səhv cavab'}
-            </p>
-            {fb.r_explanation && <p className="mt-1 text-sm text-slate-500">{fb.r_explanation}</p>}
-            <button onClick={next} className="btn btn-primary mt-4 w-full">{i + 1 >= qs.length ? 'Nəticəni gör' : 'Növbəti sual'}</button>
+            <Alert type={fb.r_correct ? 'success' : 'error'}>
+              <p className="font-semibold">{fb.r_correct ? 'Düzgün cavab!' : 'Səhv cavab'}</p>
+              {fb.r_explanation && <p className="mt-0.5 text-ink/80">{fb.r_explanation}</p>}
+            </Alert>
+            <button onClick={next} className="btn btn-primary btn-lg mt-4 w-full">
+              {i + 1 >= qs.length ? 'Nəticəni gör' : 'Növbəti sual'}<Icon name="arrowRight" className="h-4 w-4" />
+            </button>
           </div>
         )}
       </div>
@@ -159,26 +187,34 @@ export default function QuizzesPage() {
 
   return (
     <div>
-      <h1 className="text-2xl font-bold tracking-tight">Onlayn Sınaqlar</h1>
-      <p className="mb-5 text-sm text-slate-500">Taymerli testlər, dərhal nəticə</p>
-      <div className="mb-5 flex gap-2 overflow-x-auto pb-1">
+      <PageHeader title="Onlayn sınaqlar" subtitle="Taymerli testlər, dərhal nəticə və izahlar" />
+      <div className="-mx-4 mb-5 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0" role="tablist" aria-label="Kateqoriya">
         {CATS.map((c) => (
-          <button key={c || 'all'} onClick={() => setCat(c)}
-            className={`btn shrink-0 !py-1.5 ${cat === c ? 'btn-primary' : 'btn-ghost'}`}>{c || 'Hamısı'}</button>
+          <button key={c || 'all'} role="tab" aria-selected={cat === c} onClick={() => setCat(c)}
+            className={`btn btn-sm shrink-0 ${cat === c ? 'btn-primary' : 'btn-secondary'}`}>{c || 'Hamısı'}</button>
         ))}
       </div>
-      {loading ? <p className="py-16 text-center text-slate-400">Yüklənir...</p>
-        : quizzes.length === 0 ? <p className="py-16 text-center text-slate-400">Sınaq tapılmadı.</p>
-        : (
+      {loading ? (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3" aria-busy="true" aria-label="Yüklənir">{[0, 1, 2].map((i) => <div key={i} className="skeleton h-44" />)}</div>
+      ) : quizzes.length === 0 ? (
+        <EmptyState icon="quiz" title="Sınaq tapılmadı" text={cat ? 'Bu kateqoriyada hələ sınaq yoxdur.' : 'Sınaqlar tezliklə əlavə olunacaq.'}
+          action={cat ? <button className="btn btn-secondary" onClick={() => setCat('')}>Bütün sınaqlara bax</button> : null} />
+      ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {quizzes.map((z) => (
-            <div key={z.id} className="card flex flex-col p-5">
-              <span className="chip self-start">{z.category}</span>
-              <h3 className="mt-3 font-semibold">{z.title}</h3>
-              <p className="mt-1 flex-1 text-sm text-slate-500">{z.description}</p>
-              <p className="mt-3 text-xs text-slate-400">{z.quiz_questions?.[0]?.count ?? 0} sual · ⏱ {Math.round(z.duration_seconds / 60)} dəq</p>
-              <button onClick={() => setActive(z)} className="btn btn-primary mt-4">Başla</button>
-            </div>
+            <article key={z.id} className="card flex flex-col p-5 transition-shadow hover:shadow-pop">
+              <div className="flex items-start justify-between gap-3">
+                <div className="grid h-11 w-11 place-items-center rounded-lg bg-primary-soft text-primary"><Icon name="quiz" className="h-5 w-5" /></div>
+                <span className="badge">{z.category}</span>
+              </div>
+              <h2 className="mt-4 font-semibold">{z.title}</h2>
+              <p className="mt-1 flex-1 text-sm text-muted">{z.description}</p>
+              <p className="mt-4 flex items-center gap-4 text-xs text-muted">
+                <span className="inline-flex items-center gap-1"><Icon name="file" className="h-3.5 w-3.5" />{z.quiz_questions?.[0]?.count ?? 0} sual</span>
+                <span className="inline-flex items-center gap-1"><Icon name="clock" className="h-3.5 w-3.5" />{Math.round(z.duration_seconds / 60)} dəq</span>
+              </p>
+              <button onClick={() => setActive(z)} className="btn btn-primary mt-4">Başla<Icon name="arrowRight" className="h-4 w-4" /></button>
+            </article>
           ))}
         </div>
       )}

@@ -1,9 +1,15 @@
-# Təhlükəsiz yeniləmə planı (TəhsilHub v3)
+# Təhlükəsiz yeniləmə planı (TəhsilHub v4.0 — mavi-ağ dizayn)
 
 Bu sənəd addım-addımdır. Heç bir addım avtomatik icra olunmur; hər birini siz özünüz edirsiniz.
 Production sayta və real verilənlər bazasına toxunmazdan əvvəl 1–3-cü addımları edin.
 
-## 0. Nə dəyişib
+## Əvvəlcə bunu oxuyun: v4.0 yalnız dizayn yeniləməsidir
+- Verilənlər bazasında **heç nə dəyişmir**. Əgər `01`, `02`, `04`, `05` (və lazım olsa `03`) SQL faylları artıq işlədilibsə, **yeni SQL işlətmək lazım deyil**: yalnız kodu yeniləyin (4-cü bölmə).
+- Əvvəlki dizayna qayıtmaq üçün: Vercel → Deployments → əvvəlki yerləşdirmə → Promote to Production (və ya `tehsilhub-nextjs-v3.2.zip`).
+- Dizayn və testlər haqqında: `DESIGN_UPDATE_REPORT.md`, `TEST_REPORT.md`. Ekran görüntüləri: `screenshots/`.
+- Yeni mühit dəyişəni yoxdur. `.env.example` yalnız dəyişən adlarını saxlayır.
+
+## 0. Nə dəyişib (təhlükəsizlik yeniləməsi, v3)
 - Next.js 16 və React 19 (təhlükəsizlik yamaqları), `sitemap.xml`, `robots.txt`, 404/500 səhifələri, SEO metadata.
 - Sınaq cavabları artıq brauzerə göndərilmir, yoxlama serverdə aparılır. Nəticə serverdə hesablanır.
 - Sürət limitləri: çat, yeni söhbət, elan, PDF, sınaq. Baxış/yükləmə sayğacları saxtalaşdırıla bilmir.
@@ -18,7 +24,7 @@ Production sayta və real verilənlər bazasına toxunmazdan əvvəl 1–3-cü a
 
 ## 2. Əvvəlcə test mühitində yoxlayın (tövsiyə olunur)
 Real məlumata toxunmadan sınamaq üçün ikinci pulsuz Supabase layihəsi yaradın (məs. `tehsilhub-test`):
-1. SQL Editor-da ardıcıl işlədin: `01_supabase_schema.sql` → `02_hardening_phase1.sql` → `04_grants.sql` → `03_hardening_phase2.sql`.
+1. SQL Editor-da ardıcıl işlədin: `01_supabase_schema.sql` → `02_hardening_phase1.sql` → `04_grants.sql` → `05_backfill_profiles.sql` → `03_hardening_phase2.sql`.
 2. Vercel-də repo-dan yeni branch (`v3`) üçün Preview yerləşdirmə yaradın və Preview mühit dəyişənlərinə test layihənin URL və anon key-ni yazın.
 3. Preview linkində yoxlama siyahısı (aşağıda, 6-cı bölmə) edin. Yalnız bundan sonra production-a keçin.
 
@@ -28,7 +34,8 @@ Real məlumata toxunmadan sınamaq üçün ikinci pulsuz Supabase layihəsi yara
    - 3-cü cədvəl (https olmayan ünvanlar) boş olmalıdır. Sətir varsa mənə göndərin, 02-ni işlətməyin.
 2. `02_hardening_phase1.sql` işlədin. Bu mərhələ köhnə (v2) saytı pozmur, məlumat silmir və dəyişmir. Xəta olarsa avtomatik geri qayıdır.
 3. `04_grants.sql` işlədin. **Yeni Supabase layihələrində (30 may 2026-dan sonra yaradılmış) bu mütləqdir:** Supabase cədvəllərə avtomatik icazə vermir və bu fayl olmadan sayt "permission denied for table ..." xətası verir (PDF yükləmə, elan, favori və s. işləmir). Yalnız icazə əlavə edir, məlumata toxunmur, təkrar işlədilə bilər.
-4. **Hələ 03-ü işlətməyin.**
+4. `05_backfill_profiles.sql` işlədin: trigger qurulmamışdan əvvəl qeydiyyatdan keçmiş istifadəçilərə profil yaradır. Bu olmadan onlar elan, PDF və ya favori əlavə edəndə `...violates foreign key constraint` xətası alırlar. Sonda nəticə `0` olmalıdır.
+5. **Hələ 03-ü işlətməyin.**
 
 ## 4. Production saytı yeniləmək
 1. Zip-in məzmununu repoya köçürün (`node_modules`, `.next`, `.env*` repoda olmamalıdır) və push edin.

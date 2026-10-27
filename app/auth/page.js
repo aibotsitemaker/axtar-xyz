@@ -1,8 +1,10 @@
 'use client';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { supabase } from '../../lib/supabase';
+import Icon from '../../components/Icons';
+import { Alert, Spinner } from '../../components/ui';
 
 export default function AuthPage() {
   const router = useRouter();
@@ -10,9 +12,16 @@ export default function AuthPage() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [show, setShow] = useState(false);
   const [agree, setAgree] = useState(false);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState({ type: '', text: '' });
+
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get('mode') === 'register') setMode('register');
+  }, []);
+
+  function switchMode(m) { setMode(m); setMsg({ type: '', text: '' }); }
 
   async function submit(e) {
     e.preventDefault();
@@ -22,19 +31,17 @@ export default function AuthPage() {
       if (mode === 'register') {
         if (!agree) throw new Error('Davam etmək üçün şərtlərlə razılaşmalısınız.');
         if (password.length < 8) throw new Error('Parol ən azı 8 simvol olmalıdır.');
-        const { data, error } = await supabase.auth.signUp({
-          email, password, options: { data: { full_name: name } }
-        });
+        const { data, error } = await supabase.auth.signUp({ email, password, options: { data: { full_name: name } } });
         if (error) throw error;
         if (data.session) router.push('/profile');
-        else setMsg({ type: 'ok', text: 'Qeydiyyat uğurludur. E-poçtunuza göndərilən təsdiq linkinə klikləyin.' });
+        else setMsg({ type: 'success', text: 'Qeydiyyat uğurludur. E-poçtunuza göndərilən təsdiq linkinə klikləyin.' });
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
         router.push('/profile');
       }
     } catch (err) {
-      setMsg({ type: 'err', text: err.message || 'Xəta baş verdi.' });
+      setMsg({ type: 'error', text: err.message || 'Xəta baş verdi.' });
     } finally {
       setBusy(false);
     }
@@ -42,58 +49,64 @@ export default function AuthPage() {
 
   async function forgot() {
     setMsg({ type: '', text: '' });
-    if (!email) return setMsg({ type: 'err', text: 'Əvvəlcə e-poçt ünvanınızı yazın.' });
+    if (!email) return setMsg({ type: 'error', text: 'Əvvəlcə e-poçt ünvanınızı yazın.' });
     const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: `${window.location.origin}/auth/reset` });
-    setMsg(error ? { type: 'err', text: error.message } : { type: 'ok', text: 'Parol bərpası linki e-poçtunuza göndərildi.' });
+    setMsg(error ? { type: 'error', text: error.message } : { type: 'success', text: 'Parol bərpası linki e-poçtunuza göndərildi.' });
   }
 
   return (
-    <div className="mx-auto max-w-md">
-      <div className="card p-6 md:p-8">
-        <h1 className="text-2xl font-bold tracking-tight">{mode === 'login' ? 'Xoş gəldiniz' : 'Hesab yaradın'}</h1>
-        <p className="mt-1 text-sm text-slate-500">
-          {mode === 'login' ? 'Hesabınıza daxil olun.' : 'Bir neçə saniyəyə qeydiyyatdan keçin.'}
-        </p>
+    <div className="mx-auto max-w-md py-4 sm:py-10">
+      <div className="card p-6 sm:p-8">
+        <div className="mb-6 grid grid-cols-2 gap-1 rounded-lg bg-canvas p-1" role="tablist" aria-label="Giriş növü">
+          {[['login', 'Daxil ol'], ['register', 'Qeydiyyat']].map(([k, l]) => (
+            <button key={k} role="tab" aria-selected={mode === k} onClick={() => switchMode(k)}
+              className={`h-9 rounded-md text-sm font-semibold transition-colors ${mode === k ? 'bg-surface text-primary shadow-card' : 'text-muted hover:text-ink'}`}>{l}</button>
+          ))}
+        </div>
 
-        <form onSubmit={submit} className="mt-6 space-y-4">
+        <h1 className="text-2xl font-bold tracking-tight">{mode === 'login' ? 'Xoş gəlmisiniz' : 'Hesab yaradın'}</h1>
+        <p className="mt-1 text-sm text-muted">{mode === 'login' ? 'Hesabınıza daxil olun.' : 'Bir neçə saniyəyə qeydiyyatdan keçin.'}</p>
+
+        <form onSubmit={submit} className="mt-6 space-y-4" noValidate={false}>
           {mode === 'register' && (
             <div>
-              <label className="label">Ad və soyad</label>
-              <input className="input" required value={name} onChange={(e) => setName(e.target.value)} placeholder="Ad Soyad" />
+              <label htmlFor="name" className="label">Ad və soyad</label>
+              <input id="name" className="input" required autoComplete="name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Ad Soyad" />
             </div>
           )}
           <div>
-            <label className="label">E-poçt</label>
-            <input type="email" className="input" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="ad@mail.com" />
+            <label htmlFor="email" className="label">E-poçt</label>
+            <input id="email" type="email" className="input" required autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="ad@mail.com" />
           </div>
           <div>
-            <label className="label">Parol</label>
-            <input type="password" className="input" required value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" />
+            <div className="flex items-center justify-between">
+              <label htmlFor="password" className="label !mb-1.5">Parol</label>
+              {mode === 'login' && <button type="button" onClick={forgot} className="mb-1.5 text-xs font-medium text-primary hover:underline">Şifrəni unutdum</button>}
+            </div>
+            <div className="relative">
+              <input id="password" type={show ? 'text' : 'password'} className="input pr-11" required autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+                value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" />
+              <button type="button" onClick={() => setShow(!show)} aria-label={show ? 'Parolu gizlət' : 'Parolu göstər'}
+                className="absolute right-1 top-1/2 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-md text-muted hover:text-ink">
+                <Icon name={show ? 'eyeOff' : 'eye'} className="h-4 w-4" />
+              </button>
+            </div>
+            {mode === 'register' && <p className="hint">Ən azı 8 simvol.</p>}
           </div>
-          {mode === 'login' && (
-            <button type="button" onClick={forgot} className="text-xs text-brand hover:underline">Şifrəni unutdum</button>
-          )}
           {mode === 'register' && (
-            <label className="flex items-start gap-2 text-xs text-slate-500">
-              <input type="checkbox" className="mt-0.5" checked={agree} onChange={(e) => setAgree(e.target.checked)} />
+            <label className="flex items-start gap-2.5 text-sm text-muted">
+              <input type="checkbox" className="mt-0.5 h-4 w-4 rounded border-line accent-primary" checked={agree} onChange={(e) => setAgree(e.target.checked)} />
               <span>
-                <Link href="/legal/terms" className="text-brand underline">İstifadə Şərtləri</Link> və{' '}
-                <Link href="/legal/privacy" className="text-brand underline">Məxfilik Siyasəti</Link> ilə razıyam.
+                <Link href="/legal/terms" className="font-medium text-primary hover:underline">İstifadə Şərtləri</Link> və{' '}
+                <Link href="/legal/privacy" className="font-medium text-primary hover:underline">Məxfilik Siyasəti</Link> ilə razıyam.
               </span>
             </label>
           )}
-          {msg.text && (
-            <div className={`rounded-xl px-3 py-2 text-sm ${msg.type === 'ok' ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-600'}`}>{msg.text}</div>
-          )}
-          <button disabled={busy} className="btn btn-primary w-full">
-            {busy ? 'Gözləyin...' : mode === 'login' ? 'Daxil ol' : 'Qeydiyyatdan keç'}
+          {msg.text && <Alert type={msg.type}>{msg.text}</Alert>}
+          <button disabled={busy} className="btn btn-primary btn-lg w-full">
+            {busy && <Spinner />}{mode === 'login' ? 'Daxil ol' : 'Qeydiyyatdan keç'}
           </button>
         </form>
-
-        <button onClick={() => { setMode(mode === 'login' ? 'register' : 'login'); setMsg({ type: '', text: '' }); }}
-          className="mt-5 w-full text-center text-sm text-slate-500 hover:text-ink">
-          {mode === 'login' ? 'Hesabınız yoxdur? Qeydiyyat' : 'Artıq hesabınız var? Daxil olun'}
-        </button>
       </div>
     </div>
   );
