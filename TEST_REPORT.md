@@ -30,3 +30,10 @@ Real Supabase ilə qeydiyyat/giriş/şifrə bərpası e-poçtları, real fayl y�
 
 ## 4. Qalan problemlər və əl ilə addımlar
 Yerləşdirmədən sonra `DEPLOY.md` 6-cı bölmədəki yoxlama siyahısını **real telefonda və kompüterdə** keçin. Reklam əlavə etdikdən sonra brauzer konsolunda CSP xəbərdarlıqlarına baxıb siyasəti tam rejimə keçirə bilərsiniz.
+
+
+## 5. Bu təhvil sessiyasında əlavə yoxlama qeydi
+
+Bu ZIP istifadəçinin təqdim etdiyi `tehsilhub-nextjs-v4.0` arxivindən hazırlanıb. Arxiv strukturu və əsas App Router marşrutları yoxlanılıb. Bu sessiyada `npm ci` əməliyyatı icra mühitinin vaxt məhdudiyyətinə görə tamamlanmadı; buna görə `npm run lint` və `npm run build` yenidən başladılıb təsdiqlənməyib. Yuxarıdakı test cədvəli təqdim edilmiş v4.0 paketinin əvvəlki `TEST_REPORT.md` hesabatındakı nəticələrdir, bu təhvil sessiyasında təkrar icra olunmuş nəticələr kimi qəbul edilməməlidir.
+
+**Təkrar yoxlama üçün:** Node.js 20.9+ (tövsiyə: 22), `npm ci`, sonra `npm run lint` və `npm run build`. Real Supabase inteqrasiyası və canlı e-poçt axını ayrıca test mühitində yoxlanmalıdır.
