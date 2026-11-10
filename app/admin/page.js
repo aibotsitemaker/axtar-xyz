@@ -20,17 +20,22 @@ function Section({ title, children, id }) {
 // Bütün rəqəmlər admin_dashboard_stats() RPC-sindən (real verilənlər bazası) gəlir.
 export default function AdminDashboard() {
   const [stats, setStats] = useState(null);
+  const [v6, setV6] = useState(null);
+  const [period, setPeriod] = useState(7);
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(true);
 
   const load = useCallback(async () => {
     setBusy(true);
     setErr('');
-    const { data, error } = await supabase.rpc('admin_dashboard_stats');
+    const to = new Date();
+    const from = new Date(to.getTime() - period * 24 * 60 * 60 * 1000);
+    const [{ data, error }, { data: extra }] = await Promise.all([supabase.rpc('admin_dashboard_stats'), supabase.rpc('admin_v6_analytics', { p_from: from.toISOString(), p_to: to.toISOString() })]);
     setBusy(false);
     if (error || !data) { setErr(errText(error, 'Statistika yüklənmədi. 07 SQL miqrasiyasının işləndiyini yoxlayın.')); return; }
     setStats(data);
-  }, []);
+    setV6(extra || null);
+  }, [period]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -78,6 +83,10 @@ export default function AdminDashboard() {
               <StatCard label="Sınaq" value={c.quizzes} href="/admin/content?tab=quizzes" />
             </div>
           </Section>
+
+          {v6&&<Section title="TəhsilHub V6 analitikası" id="d-v6"><div className="mb-3 flex items-center gap-2"><span className="text-sm text-muted">Dövr:</span>{[7,30,90].map(n=><button key={n} onClick={()=>setPeriod(n)} className={`btn btn-sm ${period===n?'btn-primary':'btn-secondary'}`}>{n} gün</button>)}</div><div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+            <StatCard label="Feed paylaşımı" value={v6.feed_posts} href="/feed"/><StatCard label="Feed bəyənməsi" value={v6.feed_likes}/><StatCard label="Feed şərhi" value={v6.feed_comments}/><StatCard label="Müəllim rəyi" value={v6.teacher_reviews} href="/admin/reviews"/><StatCard label="Doğrulanmış hesab" value={v6.verified_users}/><StatCard label="Gözləyən doğrulama" value={v6.pending_verifications} href="/admin/verification" tone="warn"/><StatCard label="İzlənən baxış" value={v6.tracked_views}/><StatCard label="Son 7 gün baxış" value={v6.recent_views}/><StatCard label="Saxlanılan məzmun" value={v6.saved_items}/><StatCard label="Test cəhdləri" value={v6.quiz_attempts}/>
+          </div><div className="card mt-4 p-4"><h3 className="mb-3 text-sm font-semibold">Gündəlik baxışlar</h3><div className="flex h-36 items-end gap-1" role="img" aria-label={`${period} günlük baxış statistikası`}>{(v6.views_by_day||[]).map((x,i)=>{const max=Math.max(1,...(v6.views_by_day||[]).map(y=>Number(y.views)||0));const value=Number(x.views)||0;return <div key={i} className="flex h-full min-w-0 flex-1 flex-col items-center justify-end gap-1"><span className="text-[10px] text-muted">{value}</span><div title={`${new Date(x.day).toLocaleDateString('az-AZ')}: ${value} baxış`} className="w-full rounded-t bg-primary" style={{height:`${value?Math.max(5,value/max*78):1}%`}}/><span className="text-[9px] text-muted">{new Date(x.day).toLocaleDateString('az-AZ',{day:'2-digit',month:'2-digit'})}</span></div>;})}</div></div><div className="mt-3 flex gap-2"><Link className="btn btn-secondary btn-sm" href="/admin/verification">Doğrulama müraciətləri</Link><Link className="btn btn-secondary btn-sm" href="/admin/reviews">Rəylərin moderasiyası</Link></div></Section>}
 
           <div className="grid gap-6 lg:grid-cols-2">
             <Section title="Son mövzular" id="d-topics">

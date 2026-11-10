@@ -14,6 +14,7 @@ import { Alert, ConfirmDialog, EmptyState, ListSkeleton, LoadMore, Spinner } fro
 import { REPLY_PAGE, STATUS_LABEL, isUuid, loadCategories, loadProfiles } from '../../../lib/forum';
 import { errText, fmtBlockUntil, fmtDateTime, timeAgo } from '../../../lib/format';
 import { LoginPrompt } from '../../../components/AuthProvider';
+import SaveContentButton from '../../../components/SaveContentButton';
 
 const REPLY_COLS = 'id, parent_id, author_id, body, status, edited_at, created_at';
 const BODY_MAX = 10000;
@@ -151,6 +152,8 @@ export default function TopicPage() {
       .subscribe();
     return () => { clearTimeout(timer); supabase.removeChannel(ch); };
   }, [id]);
+
+  useEffect(() => { if (tState === 'ready' && topic?.id) fetch('/api/views',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({contentType:'forum_topic',contentId:topic.id}),keepalive:true}).catch(()=>{}); }, [tState,topic?.id]);
 
   const { roots, kids, known } = useMemo(() => {
     const ids = new Set(replies.map((r) => r.id));
@@ -370,7 +373,7 @@ export default function TopicPage() {
             <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-muted">
               <AuthorLine id={topic.author_id} profile={profiles[topic.author_id]} avatar />
               <span>{fmtDateTime(topic.created_at)}{topic.edited_at ? ' · redaktə edilib' : ''}</span>
-              <span>Son aktivlik: {timeAgo(topic.last_activity_at)}</span>
+              <span>Son aktivlik: {timeAgo(topic.last_activity_at)}</span><SaveContentButton type="forum_topic" id={id}/>
             </div>
             <Linkify text={topic.body} className="mt-5 text-[15px] leading-relaxed" />
             <div className="mt-5 flex flex-wrap items-center gap-1.5 border-t border-line pt-4">

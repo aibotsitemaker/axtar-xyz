@@ -10,6 +10,7 @@ const NAV = [
   { href: '/', label: 'Ana səhifə', exact: true },
   { href: '/forum', label: 'Forum' },
   { href: '/feed', label: 'Feed' },
+  { href: '/search', label: 'Axtarış' },
   { href: '/quizzes', label: 'Sınaqlar' },
   { href: '/books', label: 'Kitab elanları' },
   { href: '/pdfs', label: 'PDF arxivi' },

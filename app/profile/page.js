@@ -24,6 +24,11 @@ export default function ProfilePage() {
   const [pdfs, setPdfs] = useState([]);
   const [favs, setFavs] = useState([]);
   const [attempts, setAttempts] = useState([]);
+  const [savedItems, setSavedItems] = useState([]);
+  const [verification, setVerification] = useState(null);
+  const [verifyForm, setVerifyForm] = useState({ account_kind: 'Müəllim', work_details: '' });
+  const [verifyMsg, setVerifyMsg] = useState({ type: '', text: '' });
+  const [verifyBusy, setVerifyBusy] = useState(false);
   const [edit, setEdit] = useState({ full_name: '', city: '', bio: '' });
   const [msg, setMsg] = useState({ type: '', text: '' });
   const [delOpen, setDelOpen] = useState(false);
@@ -36,18 +41,22 @@ export default function ProfilePage() {
 
   const load = useCallback(async () => {
     if (!user) return;
-    const [p, b, f, d, a] = await Promise.all([
-      supabase.from('profiles').select('id, full_name, username, avatar_url, city, bio, created_at, account_type').eq('id', user.id).single(),
+    const [p, b, f, d, a, s, v] = await Promise.all([
+      supabase.from('profiles').select('id, full_name, username, avatar_url, city, bio, created_at, account_type, is_verified').eq('id', user.id).single(),
       supabase.from('books').select('*').eq('seller_id', user.id).order('created_at', { ascending: false }),
       supabase.from('favorites').select('*, books(*), pdfs(*)').eq('user_id', user.id).order('created_at', { ascending: false }),
       supabase.from('pdfs').select('*').eq('uploader_id', user.id).order('created_at', { ascending: false }),
-      supabase.from('quiz_attempts').select('id, correct_count, total_questions, score_percent, seconds_used, created_at, quizzes(title)').eq('user_id', user.id).order('created_at', { ascending: false }).limit(50)
+      supabase.from('quiz_attempts').select('id, correct_count, total_questions, score_percent, seconds_used, created_at, quizzes(title)').eq('user_id', user.id).order('created_at', { ascending: false }).limit(50),
+      supabase.from('saved_content').select('content_type,content_id,created_at').eq('user_id', user.id).order('created_at',{ascending:false}),
+      supabase.from('verification_requests').select('id,status,admin_note,created_at').eq('user_id',user.id).order('created_at',{ascending:false}).limit(1).maybeSingle()
     ]);
     if (p.data) { setProfile(p.data); setEdit({ full_name: p.data.full_name || '', city: p.data.city || '', bio: p.data.bio || '' }); }
     setBooks(b.data || []);
     setFavs(f.data || []);
     setPdfs(d.data || []);
     setAttempts(a.data || []);
+    setSavedItems(s.data || []);
+    setVerification(v.data || null);
   }, [user]);
 
   useEffect(() => { load(); }, [load]);
@@ -72,6 +81,17 @@ export default function ProfilePage() {
     await load();
     refreshMe();
   }
+
+  async function submitVerification(e) {
+    e.preventDefault(); setVerifyMsg({type:'',text:''});
+    if ((verifyForm.work_details||'').trim().length<20) { setVerifyMsg({type:'error',text:'Ətraflı məlumat ən azı 20 simvol olmalıdır.'}); return; }
+    setVerifyBusy(true);
+    const {error}=await supabase.from('verification_requests').insert({user_id:user.id,account_name:profile?.full_name||user.user_metadata?.full_name||'',username:profile?.username||null,account_kind:verifyForm.account_kind,work_details:verifyForm.work_details.trim()});
+    setVerifyBusy(false);
+    if(error) setVerifyMsg({type:'error',text:error.code==='23505'?'Müraciət artıq mövcuddur.':error.message});
+    else { setVerifyMsg({type:'success',text:'Müraciət adminə göndərildi.'}); await load(); }
+  }
+  async function removeSaved(item) { const {error}=await supabase.rpc('toggle_saved_content',{p_type:item.content_type,p_id:item.content_id}); if(error) setMsg({type:'error',text:error.message}); else setSavedItems(items=>items.filter(x=>x!==item)); }
 
   async function markSold(id) { await supabase.from('books').update({ status: 'sold' }).eq('id', id); load(); }
   async function delBook(id) { if (confirm('Elan silinsin?')) { await supabase.from('books').delete().eq('id', id); load(); } }
@@ -101,6 +121,7 @@ export default function ProfilePage() {
     ['books', 'Elanlarım', books.length],
     ['pdfs', 'PDF-lərim', pdfs.length],
     ['favs', 'Favorilər', favs.length],
+    ['saved', 'Yadda saxlanılanlar', savedItems.length],
     ['results', 'Sınaq nəticələrim', attempts.length],
     ['settings', 'Profil', null]
   ];
@@ -196,6 +217,8 @@ export default function ProfilePage() {
         </div>
       )}
 
+      {tab === 'saved' && <div className="space-y-3">{savedItems.length===0?<EmptyState icon="heart" title="Yadda saxlanılan məzmun yoxdur" text="Forum və Feed məzmununu buradan idarə edə bilərsiniz."/>:savedItems.map(item=><div key={`${item.content_type}-${item.content_id}`} className="card flex items-center justify-between gap-3 p-4"><div><span className="badge badge-muted">{item.content_type}</span><p className="text-xs text-muted">Saxlanılıb: {fmtDate(item.created_at)}</p></div><div className="flex gap-2"><Link className="btn btn-secondary btn-sm" href={item.content_type==='forum_topic'?`/forum/${item.content_id}`:item.content_type==='feed_post'?`/feed?post=${item.content_id}`:item.content_type==='teacher_profile'?`/u/${item.content_id}`:item.content_type==='pdf'?'/pdfs':'/books'}>Aç</Link><button onClick={()=>removeSaved(item)} className="btn btn-secondary btn-sm">Siyahıdan sil</button></div></div>)}</div>}
+
       {tab === 'results' && (
         <div className="space-y-3">
           {attempts.length === 0 && <EmptyState icon="quiz" title="Hələ sınaq nəticəniz yoxdur" text="Sınaqdan keçdikdən sonra nəticələr burada görünəcək." action={<Link href="/quizzes" className="btn btn-primary">Sınaqlara keç</Link>} />}
@@ -238,6 +261,13 @@ export default function ProfilePage() {
               <p className="mt-2 text-xs text-muted">Hesab tipi təhlükəsizlik üçün özbaşına dəyişdirilmir. Dəyişiklik lazımdırsa, administrasiyaya müraciət edin.</p>
             </div>
           )}
+
+          <section className="card space-y-4 p-5 sm:p-6" aria-labelledby="verification-heading">
+            <h2 id="verification-heading" className="text-lg font-semibold">Doğrulanmış hesab</h2>
+            {profile?.is_verified&&<Alert type="success">Hesabınız TəhsilHub tərəfindən doğrulanıb.</Alert>}
+            {verification&&<div className="rounded-lg bg-canvas p-3 text-sm">Müraciət statusu: <strong>{({pending:'Baxılır',approved:'Təsdiqlənib',rejected:'Rədd edilib',more_info:'Əlavə məlumat tələb olunur',revoked:'Ləğv edilib'})[verification.status]||verification.status}</strong>{verification.admin_note&&<p className="mt-1 text-muted">{verification.admin_note}</p>}</div>}
+            {(!verification||['rejected','more_info','revoked'].includes(verification.status))&&<form onSubmit={submitVerification} className="space-y-3"><div><label className="label" htmlFor="verify-kind">Hesabın növü</label><input id="verify-kind" className="input" maxLength={80} value={verifyForm.account_kind} onChange={e=>setVerifyForm(v=>({...v,account_kind:e.target.value}))}/></div><div><label className="label" htmlFor="verify-details">Fəaliyyətiniz və doğrulama səbəbi</label><textarea id="verify-details" className="input w-full" rows={4} maxLength={2000} value={verifyForm.work_details} onChange={e=>setVerifyForm(v=>({...v,work_details:e.target.value}))} placeholder="İş təcrübəniz, müəssisə və ya fəaliyyət sahəniz…"/></div>{verifyMsg.text&&<Alert type={verifyMsg.type}>{verifyMsg.text}</Alert>}<button className="btn btn-primary" disabled={verifyBusy}>{verifyBusy&&<Spinner/>}Doğrulama üçün müraciət et</button><p className="text-xs text-muted">Şəxsi sənəd yükləməyin; bu formda həssas sənəd qəbul edilmir.</p></form>}
+          </section>
 
           <div className="card border-danger/30 p-5 sm:p-6">
             <h2 className="text-lg font-semibold text-danger">Hesabı sil</h2>

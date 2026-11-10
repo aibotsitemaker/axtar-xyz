@@ -106,7 +106,7 @@ declare v_uid uuid:=auth.uid(); v_key text;
 begin
  if p_type not in ('pdf','book','forum_topic','profile','feed_post') or p_id is null or length(p_id)>100 then return false; end if;
  if v_uid is null then
-   if p_guest_key is null or p_guest_key !~ '^[a-f0-9-]{36}$' then return false; end if;
+   if auth.role() <> 'service_role' or p_guest_key is null or p_guest_key !~ '^[a-f0-9-]{36}$' then return false; end if;
    v_key:=p_guest_key;
  else v_key:=null; end if;
  insert into public.content_views(content_type,content_id,viewer_id,guest_key)

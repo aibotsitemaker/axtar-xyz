@@ -56,10 +56,11 @@ export default function PdfsPage() {
     if (!user) return router.push('/auth');
     if (favs.has(id)) {
       await supabase.from('favorites').delete().eq('user_id', user.id).eq('pdf_id', id);
+      await supabase.rpc('toggle_saved_content', { p_type: 'pdf', p_id: id });
       setFavs((s) => { const n = new Set(s); n.delete(id); return n; });
     } else {
       const { error } = await supabase.from('favorites').insert({ user_id: user.id, item_type: 'pdf', pdf_id: id });
-      if (!error) setFavs((s) => new Set(s).add(id));
+      if (!error) { await supabase.rpc('toggle_saved_content', { p_type: 'pdf', p_id: id }); setFavs((s) => new Set(s).add(id)); }
     }
   }
 
@@ -68,8 +69,7 @@ export default function PdfsPage() {
   }
 
   function view(p) {
-    supabase.rpc('increment_pdf_view', { p_pdf_id: p.id });
-    bump(p.id, 'view_count');
+    fetch('/api/views',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({contentType:'pdf',contentId:p.id}),keepalive:true}).then(r=>r.json()).then(r=>{if(r.ok)bump(p.id,'view_count');}).catch(()=>{});
     const u = safeUrl(p.file_url);
     if (u) window.open(u, '_blank', 'noopener');
   }

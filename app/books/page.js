@@ -52,24 +52,25 @@ export default function BooksPage() {
     if (!user) return router.push('/auth');
     if (favs.has(id)) {
       await supabase.from('favorites').delete().eq('user_id', user.id).eq('book_id', id);
+      await supabase.rpc('toggle_saved_content', { p_type: 'book', p_id: id });
       setFavs((s) => { const n = new Set(s); n.delete(id); return n; });
     } else {
       const { error } = await supabase.from('favorites').insert({ user_id: user.id, item_type: 'book', book_id: id });
-      if (!error) setFavs((s) => new Set(s).add(id));
+      if (!error) { await supabase.rpc('toggle_saved_content', { p_type: 'book', p_id: id }); setFavs((s) => new Set(s).add(id)); }
     }
   }
 
   async function openChat(b) {
     if (!user) return router.push('/auth');
     if (b.seller_id === user.id) return setMsg({ type: 'info', text: 'Bu sizin öz elanınızdır.' });
-    supabase.rpc('increment_book_view', { p_book_id: b.id });
+    fetch('/api/views',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({contentType:'book',contentId:b.id}),keepalive:true}).catch(()=>{});
     const { data, error } = await supabase.rpc('get_or_create_conversation', { p_other_user: b.seller_id, p_book_id: b.id });
     if (error) return setMsg({ type: 'error', text: error.message });
     router.push(`/chat?c=${data}`);
   }
 
   function openWhatsApp(b) {
-    supabase.rpc('increment_book_view', { p_book_id: b.id });
+    fetch('/api/views',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({contentType:'book',contentId:b.id}),keepalive:true}).catch(()=>{});
     let num = (b.whatsapp || '').replace(/\D/g, '');
     if (num.startsWith('0')) num = '994' + num.slice(1);
     if (num.length === 9) num = '994' + num;

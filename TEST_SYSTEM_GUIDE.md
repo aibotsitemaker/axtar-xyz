@@ -1,3 +1,3 @@
 # Onlayn sınaq sistemi
 
-v5-də admin tərəfindən yaradılmış testlər, taymer, server RPC ilə cavab yoxlama və nəticə tarixçəsi mövcuddur. Bu paketin auditi göstərdi ki, `check_answer` RPC düzgün cavab indeksini və izahı hər sualdan sonra brauzerə qaytarır; beləliklə cavablar test bitmədən görünür. İstifadədən əvvəl bu RPC-ni yalnız test yekunlaşandan sonra nəticə qaytaracaq axına dəyişmək lazımdır. Bu dəyişiklik bu iterasiyada tamamlanmayıb; aşağıdakı TEST_REPORT.md-də məhdudiyyət qeyd olunub.
+v5-də mövcud test yaratma və nəticə tarixçəsi qorunub. `10_workflows_and_quiz_security.sql` `check_answer` icazəsini ləğv edir, REST-dən `correct_index` və `explanation` sütunlarını gizlədir və balı serverdə hesablayır. İstifadəçi sınağa başladıqda server sessiyası və bitmə vaxtı yaradılır; cavablar hər seçimdə saxlanır və səhifə yenilənəndə aktiv sessiya bərpa olunur. Yekun sorğu idempotentdir. Adminlər v5-in admin RPC-ləri ilə test yaradır.

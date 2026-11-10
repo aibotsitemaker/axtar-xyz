@@ -1,7 +1,0 @@
-{
-  "name": "tehsilhub-db-tests",
-  "private": true,
-  "type": "module",
-  "scripts": { "test": "node test.mjs && node test_newproject.mjs" },
-  "dependencies": { "@electric-sql/pglite": "^0.5.10" }
-}

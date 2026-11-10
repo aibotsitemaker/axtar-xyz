@@ -1,3 +1,3 @@
 # Doğrulanmış hesablar
 
-İstifadəçi müraciətləri `verification_requests` cədvəlində saxlanılır və yalnız müraciət sahibi/admin görə bilər. Admin müraciətləri Supabase-də nəzərdən keçirib `status`, `admin_note`, `reviewed_by` və `reviewed_at` sahələrini yeniləyə bilər; yalnız serverin admin səlahiyyətləri ilə işləməlidir. Doğrulama nişanı `profiles.is_verified` sahəsinə bağlıdır. Bu versiyada ayrıca müraciət forması və admin UI tam qurulmayıb; həssas sənəd yükləməsi yoxdur.
+İstifadəçi Kabinet → Profil bölməsindən müraciət göndərir və öz statusunu görür. Admin `/admin/verification` səhifəsində müraciəti təsdiq, rədd, əlavə məlumat tələb et və ya ləğv edə bilər. Qərar `profiles.is_verified` nişanını server trigger-i ilə yeniləyir və istifadəçiyə bildiriş göndərir. Həssas sənəd yükləməsi bu versiyada yoxdur.
