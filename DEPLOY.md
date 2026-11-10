@@ -116,3 +116,6 @@ v5.0-dan etibarən admin hüququ `public.admin_users` cədvəlindədir (Auth ID-
 3. `https://www.axtar.xyz/ads.txt` avtomatik yaranır, yoxlayın.
 4. Avropa İqtisadi Zonası ziyarətçiləri üçün AdSense → Privacy & messaging bölməsində razılıq (cookie) mesajını aktiv edin.
 5. Hər yerləşdirmə üçün ayrıca blok istəsəniz: `<AdSlot slot="1234567890" />`.
+
+## v6 əlavə miqrasiyası
+Hazırkı bazada 06–08 artıq tətbiq edilibsə, yalnız 09_social_trust_views.sql faylını icra edin. Ətraflı: DATABASE_MIGRATIONS.md.

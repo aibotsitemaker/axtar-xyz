@@ -20,3 +20,6 @@ Mövcud `/chat` istifadəçilər arası şəxsi mesajlaşmadır və forum üçü
 
 ## Məhdudiyyətlər
 Fayl/şəkil əlavəsi yoxdur (ilk versiyada saxlama və zərərli fayl riskini artırmamaq üçün). Cavab zənciri bir səviyyədir. E-poçt bildirişi yoxdur.
+
+## v6 baxış qeydləri
+Yeni baxış RPC-si: record_content_view('forum_topic', '<topic uuid>', '<guest uuid>'). Ətraflı sxem: 09_social_trust_views.sql.

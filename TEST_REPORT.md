@@ -35,3 +35,11 @@ Bu mühitdə npm reyestrinə şəbəkə girişi bloklu idi, ona görə Next.js/E
 4. Forum: mövzu yarat → ikinci hesabdan cavab → bildiriş zəngi → şikayət → admin gizlət/sil/bərpa/sabitlə/bağla.
 5. `ADMIN_SETUP.md` üzrə Super Admin; adi hesabla `/admin` "İcazə yoxdur" göstərməlidir.
 6. Brauzer konsolunda (F12) qırmızı xəta yoxdur.
+
+## v6 əlavə audit qeydləri
+Yeni /feed səhifəsi və 09 SQL migrasiyası əlavə edildi. Quiz check_answer RPC-si cari cavab yoxlamasında düzgün cavab indeksini test bitməmiş qaytarır; bu təhlükəsizlik problemi həll edilməyib. Migration real Supabase-ə tətbiq edilməyib. Lint/build hələ icra edilməyib.
+
+Əlavə: 
+pm ci asılılıqları quraşdıra bilməyib və dayandırılıb. 
+pm run lint / 
+pm run build executable eslint / next tapılmadığına görə baş tutmadı. Canlı Supabase/RLS/storage və browser/device sınağı bu v6 işi üçün aparılmayıb. Guest view UUID-ni hazırda client ötürür; anonim sessiya imzası production-da əlavə olunmalıdır. v6 UI çatışmazlıqlarına verification workflow, review UI, qlobal axtarış, bildiriş inteqrasiyası, bütün məzmun bookmark-ı və admin analytics daxildir.
