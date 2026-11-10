@@ -19,9 +19,9 @@
 
 - v5 ZIP açıldı, əvvəlki fayllar və 06–09 miqrasiyaları saxlanıldı; `10_workflows_and_quiz_security.sql` yeni əlavə edildi.
 - `npm ci` eyni package manifest və lock faylı ilə ayrılmış yoxlama qovluğunda uğurla tamamlandı.
-- `npm run lint -- --quiet` uğurla başa çatdı: 0 xəta.
-- `npm test --prefix tests/db`: 75 mövcud sxem testi, 42 yeni Supabase layihə testi və V6/V6.1 testləri keçdi. PGlite təcrid olunmuş stub-da 09/10 miqrasiyaları iki dəfə tətbiq edildi; quiz server sessiyası, autosave, server qiymətləndirməsi, idempotency, təhlükəsiz sütunlar, qonaq deduplikasiyası/IP limiti, analitika tarixləri və qlobal axtarış yoxlandı.
-- `next build --webpack`: webpack compilation və TypeScript mərhələləri keçdi. Prerender Windows sandbox-ın `build-output/server/app/_global-error.segments/_global-error` qovluğunu yarada bilməməsi səbəbilə `EPERM` ilə dayandı; tam production build uğurlu sayılmır.
+- `npm run lint -- --quiet` yenidən uğurla başa çatdı: 0 xəta.
+- `npm test --prefix tests/db` yenidən uğurla başa çatdı: 75 sxem testi, 42 layihə testi və bütün V6.1 yoxlamaları keçdi. PGlite-də 09/10 miqrasiyaları iki dəfə tətbiq edildi; quiz server sessiyası, autosave, server qiymətləndirməsi, idempotency, təhlükəsiz sütunlar, qonaq deduplikasiyası/IP limiti, analitika tarixləri və qlobal axtarış yoxlandı.
+- `next build --webpack` yenidən icra edildi: kompilyasiya, TypeScript, 32/32 static page prerender və build trace mərhələləri uğurla tamamlandı. İlk `EPERM` Next.js worker-in sandbox-da `build-output` alt qovluqlarını yarada bilməməsi idi; yalnız build output qovluğuna yazma icazəsi verildikdən sonra build keçdi. Tətbiq kodunda build xətası aşkar edilmədi.
 - Miqrasiyalar Supabase-də icra edilməyib; canlı DB/RLS, e-poçt, storage, brauzer və mobil yoxlamaları aparılmayıb.
 
 ## Deploy konfiqurasiya
