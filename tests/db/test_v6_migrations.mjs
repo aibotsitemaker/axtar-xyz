@@ -12,11 +12,13 @@ create schema auth;
 create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid $$;
 create function auth.role() returns text language sql stable as $$ select current_setting('request.jwt.claim.role',true) $$;
 create function public.is_admin() returns boolean language sql stable as $$ select coalesce(current_setting('test.admin',true),'false')='true' $$;
+create function public.assert_admin() returns uuid language plpgsql stable as $$ begin if not public.is_admin() then raise exception 'denied'; end if; return auth.uid(); end $$;
+create function public.audit_write(text,text,text,text,jsonb) returns void language sql as $$ select $$;
 create table public.profiles(id uuid primary key,full_name text not null default '',username text,avatar_url text,city text,bio text,role text default 'user',account_type text,created_at timestamptz default now());
 create table public.books(id uuid primary key default gen_random_uuid(),status text default 'active',view_count integer default 0,title text,description text,created_at timestamptz default now());
 create table public.pdfs(id uuid primary key default gen_random_uuid(),status text default 'active',view_count integer default 0,title text,description text,subject text,created_at timestamptz default now());
 create table public.favorites(user_id uuid,item_type text,book_id uuid,pdf_id uuid,created_at timestamptz default now());
-create table public.forum_topics(id uuid primary key default gen_random_uuid(),status text default 'active',view_count bigint default 0,title text,body text,excerpt text,last_activity_at timestamptz default now(),created_at timestamptz default now());
+create table public.forum_topics(id uuid primary key default gen_random_uuid(),author_id uuid,status text default 'active',view_count bigint default 0,title text,body text,excerpt text,last_activity_at timestamptz default now(),created_at timestamptz default now());
 create table public.forum_replies(id uuid primary key default gen_random_uuid(),topic_id uuid references public.forum_topics(id),author_id uuid,body text,status text default 'active',created_at timestamptz default now());
 create table public.notifications(id uuid primary key default gen_random_uuid(),user_id uuid,actor_id uuid,type text check(type in ('forum_reply','forum_reply_to_reply','moderation')),title text,body text,link text,is_read boolean default false,created_at timestamptz default now());
 create table public.quizzes(id uuid primary key default gen_random_uuid(),duration_seconds int,is_published boolean);
@@ -31,6 +33,8 @@ grant select on public.profiles to anon,authenticated;
 grant select on public.pdfs,public.books,public.forum_topics to anon,authenticated;`);
 await db.exec(sql('09_social_trust_views.sql'));
 await db.exec(sql('09_social_trust_views.sql'));
+// Simulate a legacy rollback state: 99_rollback.sql intentionally drops both optional RPCs.
+await db.exec('drop function public.check_answer(uuid,integer); drop function public.submit_quiz_attempt(uuid,jsonb,integer);');
 await db.exec(sql('10_workflows_and_quiz_security.sql'));
 await db.exec(sql('10_workflows_and_quiz_security.sql'));
 // Simulate an older deployed RPC whose PostgreSQL input names differ. CREATE OR REPLACE
@@ -41,11 +45,13 @@ returns table(kind text,id text,title text,excerpt text,href text,created_at tim
 language sql stable as $$ select null::text,null::text,null::text,null::text,null::text,null::timestamptz where false $$;`);
 await db.exec(sql('11_supabase_postgrest_compatibility.sql'));
 await db.exec(sql('11_supabase_postgrest_compatibility.sql'));
+await db.exec(sql('12_platform_completion.sql'));
+await db.exec(sql('12_platform_completion.sql'));
 const rpc=await db.query("select to_regprocedure('public.submit_quiz_attempt_once(uuid,jsonb,integer,uuid)') as f, to_regprocedure('public.record_content_view(text,text,text,text)') as v");
-if(!rpc.rows[0].f||!rpc.rows[0].v)throw new Error('V6.1 RPC-lər yaradılmadı');
+if(!rpc.rows[0].f||!rpc.rows[0].v)throw new Error('V6 RPC-lər yaradılmadı');
 const searchArgs=await db.query("select proargnames from pg_proc where oid='public.global_search(text,text)'::regprocedure");
 if(searchArgs.rows[0]?.proargnames?.slice(0,2).join(',')!=='p_query,p_kind')throw new Error('global_search PostgREST parametr adları uyğun deyil');
-await db.exec("insert into public.profiles(id,full_name,account_type) values('a0000000-0000-0000-0000-00000000000a','Müəllim','teacher'),('b0000000-0000-0000-0000-00000000000b','Şagird','student'); insert into public.quizzes(id,duration_seconds,is_published) values('c0000000-0000-0000-0000-00000000000c',600,true); insert into public.quiz_questions(id,quiz_id,position,question_text,options,correct_index) values('d0000000-0000-0000-0000-00000000000d','c0000000-0000-0000-0000-00000000000c',1,'Sual','[\"x\",\"y\"]',1);");
+await db.exec("insert into public.profiles(id,full_name,username,account_type) values('a0000000-0000-0000-0000-00000000000a','Müəllim','teacher1','teacher'),('b0000000-0000-0000-0000-00000000000b','Şagird','student1','student'); insert into public.quizzes(id,duration_seconds,is_published) values('c0000000-0000-0000-0000-00000000000c',600,true); insert into public.quiz_questions(id,quiz_id,position,question_text,options,correct_index,explanation) values('d0000000-0000-0000-0000-00000000000d','c0000000-0000-0000-0000-00000000000c',1,'Sual','[\"x\",\"y\"]',1,'İzah');");
 await db.exec("set role authenticated; select set_config('request.jwt.claim.sub','b0000000-0000-0000-0000-00000000000b',false); select set_config('request.jwt.claim.role','authenticated',false);");
 const run=(await db.query("select * from public.start_quiz_session('c0000000-0000-0000-0000-00000000000c')")).rows[0];
 await db.query("select public.save_quiz_session_answer($1,'d0000000-0000-0000-0000-00000000000d',1)",[run.session_id]);
@@ -54,13 +60,15 @@ if(resumed.session_id!==run.session_id||resumed.answers['d0000000-0000-0000-0000
 const finished=(await db.query('select * from public.finish_quiz_session($1)',[run.session_id])).rows[0];
 const finishedAgain=(await db.query('select * from public.finish_quiz_session($1)',[run.session_id])).rows[0];
 if(finished.r_correct!==1||finished.r_attempt_id!==finishedAgain.r_attempt_id)throw new Error('Sessiya yekunu serverdə idempotent deyil');
+const review=(await db.query('select * from public.quiz_session_review($1)',[run.session_id])).rows[0];
+if(review.correct_index!==1||review.picked_index!==1||!review.is_correct)throw new Error('Təhvil sonrası sual təhlili düzgün deyil');
 let answerColumnDenied=false;try{await db.query('select correct_index from public.quiz_questions');}catch(e){answerColumnDenied=e.code==='42501';}
 if(!answerColumnDenied)throw new Error('correct_index sütunu API-dən hələ də oxunur');
 const safeColumns=await db.query('select question_text,options from public.quiz_questions');
 if(safeColumns.rows.length!==1)throw new Error('Təhlükəsiz test sütunları oxunmur');
 await db.exec("reset role; set role anon; select set_config('request.jwt.claim.role','anon',false);");
-let legacyRpcDenied=false;try{await db.query("select * from public.check_answer('d0000000-0000-0000-0000-00000000000d',1)");}catch(e){legacyRpcDenied=e.code==='42501';}
-if(!legacyRpcDenied)throw new Error('Köhnə check_answer RPC hələ açıqdır');
+let legacyRpcDenied=false;try{await db.query("select * from public.check_answer('d0000000-0000-0000-0000-00000000000d',1)");}catch(e){legacyRpcDenied=e.code==='42501'||e.code==='42883';}
+if(!legacyRpcDenied|| (await db.query("select to_regprocedure('public.check_answer(uuid,integer)') as f")).rows[0].f)throw new Error('Köhnə check_answer RPC açıqdır və ya təhlükəsiz şəkildə yoxlanmadı');
 await db.exec("reset role; insert into public.books(id,status) values('f0000000-0000-0000-0000-00000000000f','active'); set role service_role; select set_config('request.jwt.claim.sub','',false); select set_config('request.jwt.claim.role','service_role',false);");
 const view1=await db.query("select public.record_content_view('book','f0000000-0000-0000-0000-00000000000f','11111111-1111-1111-1111-111111111111',repeat('a',64)) as counted");
 const view2=await db.query("select public.record_content_view('book','f0000000-0000-0000-0000-00000000000f','11111111-1111-1111-1111-111111111111',repeat('a',64)) as counted");
@@ -73,6 +81,28 @@ const analytics=await db.query("select public.admin_v6_analytics(now()-interval 
 if(!Array.isArray(analytics.rows[0].stats.views_by_day)||analytics.rows[0].stats.views_by_day.length<1)throw new Error('Tarixə görə analitika qrafiki yaranmadı');
 const search=await db.query("select * from public.global_search(p_query=>'Müəllim',p_kind=>'all')");
 if(!search.rows.some(x=>x.kind==='profile'))throw new Error('Qlobal profil axtarışı işləmədi');
+const verifiedGrant=await db.query("select has_column_privilege('anon','public.profiles','is_verified','select') as allowed");
+if(!verifiedGrant.rows[0].allowed)throw new Error('İctimai verified nişanı üçün sütun icazəsi yoxdur');
+const stats=await db.query("select public.public_profile_stats('a0000000-0000-0000-0000-00000000000a') as stats");
+if(!stats.rows[0].stats||stats.rows[0].stats.forum_topics===undefined)throw new Error('İctimai profil statistikası alınmadı');
+await db.exec("reset role; select set_config('request.jwt.claim.sub','a0000000-0000-0000-0000-00000000000a',false); insert into public.feed_posts(id,author_id,body) values('e0000000-0000-0000-0000-00000000000e','a0000000-0000-0000-0000-00000000000a','Müəllimin paylaşımı'); set role authenticated; select set_config('request.jwt.claim.sub','b0000000-0000-0000-0000-00000000000b',false); select set_config('request.jwt.claim.role','authenticated',false);");
+await db.query("insert into public.feed_comments(post_id,author_id,body) values('e0000000-0000-0000-0000-00000000000e','b0000000-0000-0000-0000-00000000000b','Salam @teacher1')");
+await db.exec('reset role');
+const mention=await db.query("select count(*)::int as n from public.notifications where user_id='a0000000-0000-0000-0000-00000000000a' and type='feed_mention'");
+if(mention.rows[0].n!==1)throw new Error('Feed mention bildirişi yaranmadı');
+await db.exec("set role authenticated; select set_config('request.jwt.claim.sub','b0000000-0000-0000-0000-00000000000b',false); select set_config('request.jwt.claim.role','authenticated',false);");
+await db.query("insert into public.feed_reports(reporter_id,post_id,reason,details) values('b0000000-0000-0000-0000-00000000000b','e0000000-0000-0000-0000-00000000000e','spam','Yoxlama')");
+const report=(await db.query("select id from public.feed_reports where post_id='e0000000-0000-0000-0000-00000000000e'")).rows[0];
+await db.exec("select set_config('test.admin','true',false)");
+await db.query("select public.admin_resolve_feed_report($1,'resolved','Yoxlanıldı')",[report.id]);
+const reportStatus=await db.query("select status from public.feed_reports where id=$1",[report.id]);
+if(reportStatus.rows[0].status!=='resolved')throw new Error('Feed şikayətinin admin moderasiyası alınmadı');
+await db.exec("reset role; select set_config('test.admin','false',false); set role authenticated; select set_config('request.jwt.claim.sub','b0000000-0000-0000-0000-00000000000b',false); select set_config('request.jwt.claim.role','authenticated',false);");
+const stale=(await db.query("select * from public.start_quiz_session('c0000000-0000-0000-0000-00000000000c')")).rows[0];
+await db.exec(`reset role; update public.quiz_sessions set ends_at=now()-interval '1 second' where id='${stale.session_id}'; set role authenticated;`);
+const nextRun=(await db.query("select * from public.start_quiz_session('c0000000-0000-0000-0000-00000000000c')")).rows[0];
+const expired=await db.query("select status,attempt_id from public.quiz_sessions where id=$1",[stale.session_id]);
+if(!nextRun.session_id||expired.rows[0].status!=='expired'||!expired.rows[0].attempt_id)throw new Error('Müddəti bitmiş sessiya nəticəsiz itdi');
 await db.exec('reset role');
 console.log('PASS  09/10 migrations apply and re-run in isolated PostgreSQL (PGlite) stub');
  console.log('PASS  quiz answers are scored server-side and session finalization is idempotent');
@@ -80,4 +110,5 @@ console.log('PASS  quiz sessions resume, autosave answers and finalize idempoten
 console.log('PASS  correct answers are hidden, legacy answer RPC is revoked, guest views dedupe and IP throttling is atomic');
 console.log('PASS  admin analytics date filters and global search run on the database');
 console.log('PASS  PostgREST compatibility migration repairs reordered RPC argument names and re-runs safely');
+console.log('PASS  quiz review reveals answers only after submit; expired sessions are finalized; profile stats, mention notifications and Feed report moderation work');
 await db.close();

@@ -23,20 +23,21 @@ export default function PublicProfilePage() {
   const [replyTotal, setReplyTotal] = useState(0);
   const [cats, setCats] = useState({});
   const { user } = useAuth();
-  const [reviews,setReviews]=useState([]); const [rating,setRating]=useState(5); const [reviewBody,setReviewBody]=useState(''); const [reviewMsg,setReviewMsg]=useState(''); const [reviewBusy,setReviewBusy]=useState(false); const [ratingSummary,setRatingSummary]=useState({avg_rating:0,review_count:0});
+  const [reviews,setReviews]=useState([]); const [rating,setRating]=useState(5); const [reviewBody,setReviewBody]=useState(''); const [reviewMsg,setReviewMsg]=useState(''); const [reviewBusy,setReviewBusy]=useState(false); const [ratingSummary,setRatingSummary]=useState({avg_rating:0,review_count:0}); const [profileStats,setProfileStats]=useState({});
 
   useEffect(() => {
     if (!id) return undefined;
     let stop = false;
     Promise.all([
-      supabase.from('profiles').select('id, full_name, city, bio, account_type, created_at, is_verified').eq('id', id).maybeSingle(),
+      supabase.from('profiles').select('id, full_name, username, avatar_url, city, bio, account_type, created_at, is_verified').eq('id', id).maybeSingle(),
       supabase.from('forum_topics').select('id, title, category_id, reply_count, last_activity_at, created_at', { count: 'exact' })
         .eq('author_id', id).eq('status', 'active').order('created_at', { ascending: false }).limit(20),
       supabase.from('forum_replies').select('id', { count: 'exact', head: true }).eq('author_id', id).eq('status', 'active'),
       loadCategories(),
       supabase.from('teacher_reviews').select('id,author_id,rating,body,created_at,profiles!teacher_reviews_author_id_fkey(full_name)').eq('teacher_id',id).eq('status','active').order('created_at',{ascending:false}).limit(50),
-      supabase.rpc('review_rating_summary',{p_teacher:id})
-    ]).then(([p, t, r, c,rv,rs]) => {
+      supabase.rpc('review_rating_summary',{p_teacher:id}),
+      supabase.rpc('public_profile_stats',{p_user:id})
+    ]).then(([p, t, r, c,rv,rs,ps]) => {
       if (stop) return;
       if (p.error) { setState('error'); return; }
       if (!p.data) { setState('missing'); return; }
@@ -46,6 +47,7 @@ export default function PublicProfilePage() {
       setReplyTotal(r.count ?? 0);
       setCats(Object.fromEntries(c.map((x) => [x.id, x])));
       setReviews(rv.data||[]);setRatingSummary(rs.data?.[0]||{avg_rating:0,review_count:0});
+      setProfileStats(ps.data||{});
       setState('ready');
       document.title = `${p.data.full_name || 'İstifadəçi'} | TəhsilHub`;
     }).catch(() => { if (!stop) setState('error'); });
@@ -68,7 +70,7 @@ export default function PublicProfilePage() {
 
       <section className="card p-5 sm:p-6" aria-labelledby="u-name">
         <div className="flex items-start gap-4">
-          <div className="grid h-16 w-16 shrink-0 place-items-center rounded-full bg-primary text-2xl font-bold text-white" aria-hidden="true">{name[0].toUpperCase()}</div>
+          <div className="grid h-16 w-16 shrink-0 place-items-center overflow-hidden rounded-full bg-primary text-2xl font-bold text-white" aria-hidden="true">{profile.avatar_url ? <img src={profile.avatar_url} alt="" className="h-full w-full object-cover" /> : name[0].toUpperCase()}</div>
           <div className="min-w-0">
             <h1 id="u-name" className="break-words text-xl font-bold tracking-tight sm:text-2xl">{name} {profile.is_verified&&<span className="text-blue-500" title="TəhsilHub tərəfindən doğrulanıb" aria-label="Doğrulanmış hesab">✓</span>}</h1>
             <p className="mt-1.5 flex flex-wrap items-center gap-2 text-sm text-muted">
@@ -83,6 +85,10 @@ export default function PublicProfilePage() {
         <dl className="mt-5 grid grid-cols-2 gap-3 border-t border-line pt-4 text-center">
           <div className="rounded-lg bg-canvas px-3 py-2"><dt className="text-xs text-muted">Mövzu</dt><dd className="text-lg font-bold">{topicTotal}</dd></div>
           <div className="rounded-lg bg-canvas px-3 py-2"><dt className="text-xs text-muted">Cavab</dt><dd className="text-lg font-bold">{replyTotal}</dd></div>
+          <div className="rounded-lg bg-canvas px-3 py-2"><dt className="text-xs text-muted">Feed paylaşımı</dt><dd className="text-lg font-bold">{profileStats.feed_posts||0}</dd></div>
+          <div className="rounded-lg bg-canvas px-3 py-2"><dt className="text-xs text-muted">Bəyənmə</dt><dd className="text-lg font-bold">{profileStats.feed_likes_received||0}</dd></div>
+          <div className="rounded-lg bg-canvas px-3 py-2"><dt className="text-xs text-muted">Ümumi baxış</dt><dd className="text-lg font-bold">{profileStats.total_views||0}</dd></div>
+          {profile.account_type==='teacher'&&<div className="rounded-lg bg-canvas px-3 py-2"><dt className="text-xs text-muted">Orta rəy</dt><dd className="text-lg font-bold">★ {profileStats.avg_rating||'0.00'} · {profileStats.review_count||0}</dd></div>}
         </dl>
       </section>
 

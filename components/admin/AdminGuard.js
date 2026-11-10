@@ -10,6 +10,7 @@ const TABS = [
   { href: '/admin/users', label: 'İstifadəçilər', icon: 'users' },
   { href: '/admin/forum', label: 'Forum', icon: 'message' },
   { href: '/admin/reports', label: 'Şikayətlər', icon: 'flag' },
+  { href: '/admin/feed-reports', label: 'Feed şikayətləri', icon: 'flag' },
   { href: '/admin/categories', label: 'Kateqoriyalar', icon: 'folder' },
   { href: '/admin/content', label: 'Məzmun', icon: 'book' },
   { href: '/admin/audit', label: 'Audit jurnalı', icon: 'list' },

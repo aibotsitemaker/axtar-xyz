@@ -5,6 +5,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useAuth } from './AuthProvider';
 import { supabase } from '../lib/supabase';
 import Icon from './Icons';
+import ThemeToggle from './ThemeToggle';
 
 const NAV = [
   { href: '/', label: 'Ana səhifə', exact: true },
@@ -132,11 +133,14 @@ export default function Shell({ children }) {
             )}
           </div>
 
-          <button className="grid h-10 w-10 place-items-center rounded-lg border border-line text-ink lg:hidden"
-            aria-label={menu ? 'Menyunu bağla' : 'Menyunu aç'} aria-expanded={menu} aria-controls="mobile-menu"
-            onClick={() => setMenu(!menu)}>
-            <Icon name={menu ? 'x' : 'menu'} />
-          </button>
+          <div className="flex items-center gap-2">
+            <ThemeToggle />
+            <button className="grid h-10 w-10 place-items-center rounded-lg border border-line text-ink lg:hidden"
+              aria-label={menu ? 'Menyunu bağla' : 'Menyunu aç'} aria-expanded={menu} aria-controls="mobile-menu"
+              onClick={() => setMenu(!menu)}>
+              <Icon name={menu ? 'x' : 'menu'} />
+            </button>
+          </div>
         </div>
 
         {menu && (

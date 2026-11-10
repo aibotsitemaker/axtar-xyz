@@ -5,6 +5,7 @@
 /* ---- Dizayn tokenləri (rənglər burada dəyişdirilir; RGB kanalları) ---- */
 @layer base {
   :root {
+    color-scheme: light;
     --primary: 37 99 235;        /* #2563EB */
     --primary-hover: 29 78 216;  /* #1D4ED8 */
     --primary-soft: 239 246 255; /* #EFF6FF */
@@ -19,6 +20,23 @@
     --danger-soft: 254 242 242;
     --warning: 217 119 6;        /* #D97706 */
     --warning-soft: 255 251 235;
+  }
+  :root[data-theme='dark'] {
+    color-scheme: dark;
+    --primary: 96 165 250;
+    --primary-hover: 147 197 253;
+    --primary-soft: 30 58 92;
+    --canvas: 15 23 42;
+    --surface: 30 41 59;
+    --ink: 226 232 240;
+    --muted: 148 163 184;
+    --line: 71 85 105;
+    --success: 74 222 128;
+    --success-soft: 20 52 39;
+    --danger: 248 113 113;
+    --danger-soft: 69 31 38;
+    --warning: 251 191 36;
+    --warning-soft: 66 52 20;
   }
   html { -webkit-tap-highlight-color: transparent; scroll-behavior: smooth; }
   body { @apply bg-canvas text-ink antialiased; }

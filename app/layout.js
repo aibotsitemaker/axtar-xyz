@@ -22,8 +22,9 @@ const jsonLd = { '@context': 'https://schema.org', '@type': 'WebSite', name: SIT
 export default function RootLayout({ children }) {
   const ad = ADSENSE_CLIENT;
   return (
-    <html lang="az">
+    <html lang="az" suppressHydrationWarning>
       <body>
+        <script dangerouslySetInnerHTML={{ __html: "try{document.documentElement.dataset.theme=localStorage.getItem('tehsilhub-theme')==='dark'?'dark':'light'}catch{document.documentElement.dataset.theme='light'}" }} />
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
         {ad ? (
           <Script async strategy="afterInteractive" crossOrigin="anonymous"

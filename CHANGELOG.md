@@ -19,3 +19,10 @@
 - 09/10 miqrasiyalarında PostgREST schema cache yenilənməsi əlavə edildi.
 - Axtarış RPC-si parametr adı uyğunsuzluğu olan köhnə DB funksiyasından təhlükəsiz şəkildə yenidən yaradılır.
 - Yeni 11-ci uyğunluq miqrasiyası, Supabase REST diaqnostikası və digər modulların schema/RPC auditi əlavə edildi.
+
+## v6.3
+- Profil avatarını Supabase Storage-a yükləmə və silmə, Feed-də avatarlar və verified nişanları tamamlandı.
+- Açıq/tünd tema seçimi, profil fəaliyyəti statistikası, Feed qeyd etmə bildirişləri və post/şərh şikayətləri əlavə edildi.
+- Admin Feed şikayətlərini həll edib qərarı audit jurnalına yaza bilər.
+- Sınaqda sual gəzişi, cavabı dəyişmə, oflayn müvəqqəti saxlanma və təqdimatdan sonra izahlı cavab təhlili əlavə edildi.
+- `12_platform_completion.sql` əlavə olundu; `is_verified` API icazəsi və qeyd edilən yeni imkanların RPC/RLS dəstəyi düzəldildi.

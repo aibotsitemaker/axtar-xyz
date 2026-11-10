@@ -38,6 +38,8 @@ export default function ProfilePage() {
   const [pickType, setPickType] = useState('');
   const [typeBusy, setTypeBusy] = useState(false);
   const [typeMsg, setTypeMsg] = useState({ type: '', text: '' });
+  const [avatarBusy, setAvatarBusy] = useState(false);
+  const [avatarMsg, setAvatarMsg] = useState({ type: '', text: '' });
 
   const load = useCallback(async () => {
     if (!user) return;
@@ -93,6 +95,79 @@ export default function ProfilePage() {
   }
   async function removeSaved(item) { const {error}=await supabase.rpc('toggle_saved_content',{p_type:item.content_type,p_id:item.content_id}); if(error) setMsg({type:'error',text:error.message}); else setSavedItems(items=>items.filter(x=>x!==item)); }
 
+  async function changeAvatar(event) {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+    const allowed = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' };
+    if (!allowed[file.type] || file.size > 2 * 1024 * 1024) {
+      setAvatarMsg({ type: 'error', text: 'JPG, PNG və ya WebP şəkli seçin (maksimum 2 MB).' });
+      return;
+    }
+    try {
+      if (typeof createImageBitmap === 'function') {
+        const bitmap = await createImageBitmap(file);
+        const valid = bitmap.width > 0 && bitmap.height > 0 && bitmap.width <= 6000 && bitmap.height <= 6000;
+        bitmap.close();
+        if (!valid) throw new Error('Şəkil ölçüsü yanlışdır.');
+      }
+    } catch {
+      setAvatarMsg({ type: 'error', text: 'Fayl etibarlı şəkil kimi oxunmadı.' });
+      return;
+    }
+    setAvatarBusy(true);
+    setAvatarMsg({ type: '', text: '' });
+    const path = `${user.id}/${crypto.randomUUID()}.${allowed[file.type]}`;
+    const storage = supabase.storage.from('avatars');
+    const { error: uploadError } = await storage.upload(path, file, { contentType: file.type, cacheControl: '3600', upsert: false });
+    if (uploadError) {
+      setAvatarBusy(false);
+      setAvatarMsg({ type: 'error', text: errText(uploadError, 'Şəkli yükləmək mümkün olmadı.') });
+      return;
+    }
+    const url = storage.getPublicUrl(path).data.publicUrl;
+    const previousPath = (() => {
+      const marker = '/storage/v1/object/public/avatars/';
+      const oldUrl = profile?.avatar_url || '';
+      if (!oldUrl.includes(marker)) return null;
+      try {
+        const oldPath = decodeURIComponent(oldUrl.split(marker)[1].split('?')[0]);
+        return oldPath.startsWith(`${user.id}/`) ? oldPath : null;
+      } catch { return null; }
+    })();
+    const { error: profileError } = await supabase.from('profiles').update({ avatar_url: url }).eq('id', user.id);
+    if (profileError) {
+      await storage.remove([path]);
+      setAvatarBusy(false);
+      setAvatarMsg({ type: 'error', text: errText(profileError, 'Profil şəklini saxlamaq mümkün olmadı.') });
+      return;
+    }
+    if (previousPath) await storage.remove([previousPath]);
+    setProfile((old) => ({ ...old, avatar_url: url }));
+    setAvatarBusy(false);
+    setAvatarMsg({ type: 'success', text: 'Profil şəkli yeniləndi.' });
+  }
+
+  async function removeAvatar() {
+    if (!profile?.avatar_url || avatarBusy) return;
+    setAvatarBusy(true);
+    setAvatarMsg({ type: '', text: '' });
+    const { error } = await supabase.from('profiles').update({ avatar_url: null }).eq('id', user.id);
+    if (error) {
+      setAvatarBusy(false);
+      setAvatarMsg({ type: 'error', text: errText(error, 'Profil şəklini silmək mümkün olmadı.') });
+      return;
+    }
+    const marker = '/storage/v1/object/public/avatars/';
+    try {
+      const objectPath = decodeURIComponent(profile.avatar_url.split(marker)[1]?.split('?')[0] || '');
+      if (objectPath.startsWith(`${user.id}/`)) await supabase.storage.from('avatars').remove([objectPath]);
+    } catch { /* Profil dəyəri artıq silinib; köhnə fayl təmizlənməsə də şəkil görünməyəcək. */ }
+    setProfile((old) => ({ ...old, avatar_url: null }));
+    setAvatarBusy(false);
+    setAvatarMsg({ type: 'success', text: 'Profil şəkli silindi.' });
+  }
+
   async function markSold(id) { await supabase.from('books').update({ status: 'sold' }).eq('id', id); load(); }
   async function delBook(id) { if (confirm('Elan silinsin?')) { await supabase.from('books').delete().eq('id', id); load(); } }
   async function delPdf(id) { if (confirm('PDF silinsin?')) { await supabase.from('pdfs').delete().eq('id', id); load(); } }
@@ -132,7 +207,7 @@ export default function ProfilePage() {
     <div>
       <div className="card mb-6 flex flex-wrap items-center justify-between gap-4 p-5">
         <div className="flex min-w-0 items-center gap-4">
-          <div className="grid h-14 w-14 shrink-0 place-items-center rounded-full bg-primary text-xl font-bold text-white">{name[0].toUpperCase()}</div>
+          <div className="grid h-14 w-14 shrink-0 place-items-center overflow-hidden rounded-full bg-primary text-xl font-bold text-white">{profile?.avatar_url ? <img src={profile.avatar_url} alt="Profil şəkli" className="h-full w-full object-cover" /> : name[0].toUpperCase()}</div>
           <div className="min-w-0">
             <h1 className="truncate text-xl font-bold tracking-tight">{profile?.full_name || 'İstifadəçi'}</h1>
             <p className="truncate text-sm text-muted">{user.email}</p>
@@ -236,6 +311,15 @@ export default function ProfilePage() {
 
       {tab === 'settings' && (
         <div className="max-w-lg space-y-6">
+          <section className="card space-y-3 p-5 sm:p-6" aria-labelledby="avatar-title">
+            <h2 id="avatar-title" className="text-lg font-semibold">Profil şəkli</h2>
+            <p className="text-sm text-muted">JPG, PNG və WebP qəbul edilir. Maksimum ölçü 2 MB-dır.</p>
+            <div className="flex flex-wrap gap-2">
+              <label className="btn btn-secondary cursor-pointer">{avatarBusy ? <Spinner /> : <Icon name="upload" className="h-4 w-4" />}Şəkil seç<input type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" disabled={avatarBusy} onChange={changeAvatar} /></label>
+              {profile?.avatar_url && <button type="button" className="btn btn-danger" disabled={avatarBusy} onClick={removeAvatar}>Şəkli sil</button>}
+            </div>
+            {avatarMsg.text && <Alert type={avatarMsg.type}>{avatarMsg.text}</Alert>}
+          </section>
           <form onSubmit={save} className="card space-y-4 p-5 sm:p-6">
             <h2 className="text-lg font-semibold">Profil məlumatları</h2>
             <div><label htmlFor="f-name" className="label">Ad və soyad</label><input id="f-name" className="input" value={edit.full_name} onChange={(e) => setEdit({ ...edit, full_name: e.target.value })} /></div>
