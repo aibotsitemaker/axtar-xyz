@@ -11,7 +11,8 @@ const NAV = [
   { href: '/quizzes', label: 'Sınaqlar' },
   { href: '/books', label: 'Kitab elanları' },
   { href: '/pdfs', label: 'PDF arxivi' },
-  { href: '/chat', label: 'Çat' }
+  { href: '/chat', label: 'Çat' },
+  { href: '/forum', label: 'Forum' }
 ];
 
 function Logo() {
@@ -30,6 +31,8 @@ export default function Shell({ children }) {
   const [menu, setMenu] = useState(false);
   const [drop, setDrop] = useState(false);
   const [unread, setUnread] = useState(0);
+  const [adminState, setAdminState] = useState({ id: null, value: false });
+  const isAdmin = adminState.id === user?.id && adminState.value;
   const dropRef = useRef(null);
 
   const active = (n) => (n.exact ? path === n.href : path === n.href || path.startsWith(n.href + '/'));
@@ -54,6 +57,13 @@ export default function Shell({ children }) {
     const t = setInterval(load, 60000);
     return () => { stop = true; clearInterval(t); };
   }, [user, path]);
+
+  useEffect(() => {
+    if (!user) return undefined;
+    let alive = true;
+    supabase.rpc('is_admin').then(({ data }) => { if (alive) setAdminState({ id: user.id, value: data === true }); });
+    return () => { alive = false; };
+  }, [user]);
 
   async function logout() {
     setDrop(false); setMenu(false);
@@ -104,6 +114,8 @@ export default function Shell({ children }) {
                     </div>
                     <Link role="menuitem" href="/profile" className="mt-1 flex items-center gap-2 rounded-lg px-3 py-2 text-sm hover:bg-canvas"><Icon name="user" className="h-4 w-4 text-muted" />Kabinet</Link>
                     <Link role="menuitem" href="/chat" className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm hover:bg-canvas"><Icon name="chat" className="h-4 w-4 text-muted" />Mesajlar{unread > 0 ? ` (${unread})` : ''}</Link>
+                    <Link role="menuitem" href="/forum" className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm hover:bg-canvas">Forum</Link>
+                    {isAdmin && <Link role="menuitem" href="/admin" className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm hover:bg-canvas">İdarəetmə</Link>}
                     <button role="menuitem" onClick={logout} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-danger hover:bg-danger-soft"><Icon name="logout" className="h-4 w-4" />Çıxış</button>
                   </div>
                 )}
@@ -137,6 +149,7 @@ export default function Shell({ children }) {
                 ) : (
                   <>
                     <Link href="/profile" className="btn btn-secondary"><Icon name="user" className="h-4 w-4" />Kabinet</Link>
+                    <Link href="/forum" className="btn btn-secondary">Forum</Link>
                     <button onClick={logout} className="btn btn-danger"><Icon name="logout" className="h-4 w-4" />Çıxış</button>
                   </>
                 )}

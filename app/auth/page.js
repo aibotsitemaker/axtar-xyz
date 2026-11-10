@@ -10,6 +10,7 @@ export default function AuthPage() {
   const router = useRouter();
   const [mode, setMode] = useState('login');
   const [name, setName] = useState('');
+  const [userType, setUserType] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [show, setShow] = useState(false);
@@ -30,8 +31,9 @@ export default function AuthPage() {
     try {
       if (mode === 'register') {
         if (!agree) throw new Error('Davam etmək üçün şərtlərlə razılaşmalısınız.');
+        if (!['teacher', 'student', 'university_student'].includes(userType)) throw new Error('İstifadəçi tipini seçin.');
         if (password.length < 8) throw new Error('Parol ən azı 8 simvol olmalıdır.');
-        const { data, error } = await supabase.auth.signUp({ email, password, options: { data: { full_name: name } } });
+        const { data, error } = await supabase.auth.signUp({ email, password, options: { data: { full_name: name, user_type: userType } } });
         if (error) throw error;
         if (data.session) router.push('/profile');
         else setMsg({ type: 'success', text: 'Qeydiyyat uğurludur. E-poçtunuza göndərilən təsdiq linkinə klikləyin.' });
@@ -73,6 +75,23 @@ export default function AuthPage() {
               <label htmlFor="name" className="label">Ad və soyad</label>
               <input id="name" className="input" required autoComplete="name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Ad Soyad" />
             </div>
+          )}
+          {mode === 'register' && (
+            <fieldset>
+              <legend className="label">Mən kiməm? <span className="text-danger">*</span></legend>
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                {[
+                  ['teacher', 'Müəllim', 'Tədris və müəllim icması'],
+                  ['student', 'Şagird', 'Məktəb və ümumi təhsil'],
+                  ['university_student', 'Tələbə', 'Universitet həyatı']
+                ].map(([value, title, detail]) => (
+                  <button key={value} type="button" aria-pressed={userType === value} onClick={() => setUserType(value)}
+                    className={`rounded-xl border p-3 text-left transition ${userType === value ? 'border-primary bg-primary-soft text-primary ring-2 ring-primary/20' : 'border-line hover:border-primary/50'}`}>
+                    <span className="block text-sm font-semibold">{title}</span><span className="mt-1 block text-xs text-muted">{detail}</span>
+                  </button>
+                ))}
+              </div>
+            </fieldset>
           )}
           <div>
             <label htmlFor="email" className="label">E-poçt</label>

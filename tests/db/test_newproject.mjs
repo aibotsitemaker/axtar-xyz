@@ -3,9 +3,11 @@ import { PGlite } from '@electric-sql/pglite';
 import { pg_trgm } from '@electric-sql/pglite/contrib/pg_trgm';
 import { pgcrypto } from '@electric-sql/pglite/contrib/pgcrypto';
 import fs from 'fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const R = new URL('../../', import.meta.url).pathname;
-const sql = (f) => fs.readFileSync(R + f, 'utf8');
+const R = fileURLToPath(new URL('../../', import.meta.url));
+const sql = (f) => fs.readFileSync(path.join(R, f), 'utf8');
 const STUBS = `
 create role anon nologin; create role authenticated nologin; create role service_role nologin bypassrls;
 create schema auth;
@@ -126,6 +128,44 @@ ok('order 04 -> 02 -> 03: upload still works', (await val(d2, `select count(*)::
   ok('AFTER 05: new signups get a profile via the (re)created trigger', (await val(d3, `select count(*)::int c from profiles`))[0].c === 3);
   await d3.exec(`update profiles set full_name='Edited' where id='${A}'`); await d3.exec(sql('05_backfill_profiles.sql'));
   ok('05 never overwrites existing profiles', (await val(d3, `select full_name from profiles where id='${A}'`))[0].full_name === 'Edited');
+}
+
+// 8) Forum + user types + admin registry migration
+{
+  const forum = await fresh(); await seed(forum);
+  await forum.exec(sql('02_hardening_phase1.sql'));
+  await forum.exec(sql('04_grants.sql'));
+  await forum.exec(sql('05_backfill_profiles.sql'));
+  await forum.exec(sql('03_hardening_phase2.sql'));
+  await forum.exec(sql('06_forum_roles_admin.sql'));
+  await forum.exec(sql('06_forum_roles_admin.sql'));
+  ok('06 migration applies twice and seeds eight categories', (await val(forum, `select count(*)::int c from forum_categories`))[0].c === 8);
+  const cat = (await val(forum, `select id from forum_categories limit 1`))[0].id;
+  await q(forum, A, 'authenticated', `insert into forum_topics(author_id,category_id,title,body) values ('${A}',${cat},'Müzakirə mövzusu','Bu mövzu üçün kifayət qədər ətraflı başlanğıc mətni var.')`);
+  const topicId = (await val(forum, `select id from forum_topics`))[0].id;
+  await q(forum, B, 'authenticated', `insert into forum_replies(topic_id,author_id,body) values ('${topicId}','${B}','Mənim cavabım, bu mövzunu müzakirəyə davam etdirək.')`);
+  ok('forum: another signed-in user can reply and topic owner receives notification', (await val(forum, `select count(*)::int c from forum_notifications where user_id='${A}'`))[0].c === 1);
+  ok('forum: anon reads public topic and stats RPC', (await q(forum, null, 'anon', `select * from forum_topic_stats(array['${topicId}']::uuid[])`)).rows[0].reply_count === 1);
+  ok('forum: server-side search matches topic body', (await q(forum, null, 'anon', `select id from forum_search_topics('ətraflı başlanğıc', null, 'recent', 0, 30)`)).rows[0].id === topicId);
+  await q(forum, B, 'authenticated', `update forum_topics set title='Dəyişdirilmiş mövzu' where id='${topicId}'`);
+  ok('forum: another user cannot edit owner topic', (await val(forum, `select title from forum_topics where id='${topicId}'`))[0].title === 'Müzakirə mövzusu');
+  await expectFail('forum notification: recipient cannot rewrite its target or owner', forum, A, 'authenticated', `update forum_notifications set user_id='${B}' where user_id='${A}'`, /Bildiriş məlumatını dəyişmək olmaz/);
+  await expectFail('forum: exact duplicate topic content is rejected', forum, A, 'authenticated', `insert into forum_topics(author_id,category_id,title,body) values ('${A}',${cat},'Təkrar müzakirə','Bu mövzu üçün kifayət qədər ətraflı başlanğıc mətni var.')`, /Eyni məzmun təkrar/);
+  for (let i=0;i<9;i++) await q(forum, A, 'authenticated', `insert into forum_topics(author_id,category_id,title,body) values ('${A}',${cat},'Mövzu limit testi ${i}','Unikal test mətni, təkrar deyil: ${i}')`);
+  await expectFail('forum: 11th topic in an hour is rejected by database', forum, A, 'authenticated', `insert into forum_topics(author_id,category_id,title,body) values ('${A}',${cat},'Mövzu limit testi son','Unikal son test mətni')`, /Saatlıq mövzu limiti/);
+  for (let i=0;i<29;i++) await q(forum, B, 'authenticated', `insert into forum_replies(topic_id,author_id,body) values ('${topicId}','${B}','Unikal test cavabı ${i}')`);
+  await expectFail('forum: 31st reply in an hour is rejected by database', forum, B, 'authenticated', `insert into forum_replies(topic_id,author_id,body) values ('${topicId}','${B}','Saatlıq limitdən artıq cavab')`, /Saatlıq cavab limiti/);
+  await expectFail('forum: author cannot self-pin or lock topic', forum, A, 'authenticated', `update forum_topics set is_pinned=true where id='${topicId}'`, /Bu mövzu əməliyyatına icazə yoxdur/);
+  await q(forum, A, 'authenticated', `update profiles set user_type='teacher' where id='${A}'`);
+  ok('user type: profile owner cannot change their own type after signup', (await val(forum, `select user_type from profiles where id='${A}'`))[0].user_type === 'student');
+  await forum.exec(`insert into platform_admins(user_id) values ('${A}')`);
+  await q(forum, A, 'authenticated', `update forum_topics set is_pinned=true where id='${topicId}'`);
+  ok('admin registry permits moderation and records audit', (await val(forum, `select count(*)::int c from admin_audit_log where target_id='${topicId}'`))[0].c === 1);
+  await q(forum, A, 'authenticated', `insert into forum_reports(reporter_id,topic_id,reason) values ('${A}','${topicId}','Yoxlanması xahiş edilən uyğun olmayan məzmun')`);
+  await expectFail('forum report: duplicate reports from same user are limited', forum, A, 'authenticated', `insert into forum_reports(reporter_id,topic_id,reason) values ('${A}','${topicId}','Eyni hədəfə təkrar şikayət göndərirəm')`, /duplicate key|unique/i);
+  await forum.exec(`delete from auth.users where id='${A}'`);
+  const preserved = (await val(forum, `select (select count(*)::int from forum_topics where id='${topicId}' and author_id is null) topic_count, (select count(*)::int from forum_replies where topic_id='${topicId}') reply_count`))[0];
+  ok('forum: account deletion anonymizes author and preserves topic and replies', preserved.topic_count === 1 && preserved.reply_count === 30);
 }
 
 console.log(log.join('\n')); console.log(`\nTOTAL: ${pass} passed, ${fail} failed`); process.exit(fail ? 1 : 0);

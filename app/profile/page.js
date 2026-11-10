@@ -30,7 +30,7 @@ export default function ProfilePage() {
   const load = useCallback(async () => {
     if (!user) return;
     const [p, b, f, d, a] = await Promise.all([
-      supabase.from('profiles').select('id, full_name, username, avatar_url, city, bio, created_at').eq('id', user.id).single(),
+      supabase.from('profiles').select('id, full_name, username, avatar_url, city, bio, user_type, created_at').eq('id', user.id).single(),
       supabase.from('books').select('*').eq('seller_id', user.id).order('created_at', { ascending: false }),
       supabase.from('favorites').select('*, books(*), pdfs(*)').eq('user_id', user.id).order('created_at', { ascending: false }),
       supabase.from('pdfs').select('*').eq('uploader_id', user.id).order('created_at', { ascending: false }),
@@ -94,6 +94,7 @@ export default function ProfilePage() {
           <div className="min-w-0">
             <h1 className="truncate text-xl font-bold tracking-tight">{profile?.full_name || 'İstifadəçi'}</h1>
             <p className="truncate text-sm text-muted">{user.email}</p>
+            {profile?.user_type && <span className="mt-1 inline-flex rounded-full bg-primary-soft px-2.5 py-1 text-xs font-medium text-primary">{({ teacher: 'Müəllim', student: 'Şagird', university_student: 'Tələbə' })[profile.user_type]}</span>}
           </div>
         </div>
         <div className="flex gap-2">

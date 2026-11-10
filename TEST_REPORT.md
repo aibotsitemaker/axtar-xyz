@@ -1,32 +1,24 @@
-# TəhsilHub v4.0 — Test hesabatı
+# Test hesabatı
 
-**Mühit:** sandbox (Linux), Node 22, Next.js 16.4.2, headless Chromium 153. **Real Supabase hesabı, e-poçt, real telefon və Safari/Firefox yoxdur.** Brauzer testləri üçün PostgREST/Auth/Storage cavablarını təqlid edən saxta server (`tests/browser/mock.mjs`) işlədilib. Ekran görüntüləri sistem ehtiyat şrifti (Inter əvəzinə) ilə çəkilib, real cihazlarda mətn bir qədər fərqli görünə bilər.
+## Bu dəyişikliklər üzrə nəticə
 
-## 1. Faktiki icra olunan və keçən testlər
-| Test | Nəticə |
-|---|---|
-| `npm run build` (production) | Uğurlu, 16 marşrut |
-| `npm run lint` | 0 xəta, 11 xəbərdarlıq (`set-state-in-effect`: məlumat yükləmə effektləri; qəsdən `warn`) |
-| `npm audit` (inkişaf asılılıqları daxil) | 0 zəiflik; kilid faylı uyğun (`npm ci --dry-run`) |
-| SQL testləri, köhnə rejim (`tests/db/test.mjs`) | 75/75 |
-| SQL testləri, yeni Supabase rejimi (`test_newproject.mjs`) | 42/42 |
-| **Brauzer: layout** — 17 marşrut × 4 ölçü (360/390/768/1280) | 68/68: üfüqi scroll yoxdur, hər səhifədə bir `h1`, `alt`-sız şəkil yoxdur |
-| **Brauzer: interaksiyalar** (mobil 390 / desktop 1280) | 19/19 (aşağıda) |
-| **axe-core WCAG 2.1 A/AA**, 8 səhifə × mobil/desktop | 16 skan, 0 pozuntu (rəng kontrastı daxil) |
-| Konsol xətaları (bütün testlər) | Yalnız `/nope` səhifəsinin gözlənilən 404-ü |
+Bu mühitdə forum, istifadəçi tipləri, admin API və miqrasiya üçün real Supabase giriş məlumatları olmadığından DB inteqrasiyası, iki istifadəçi ilə RLS yoxlaması, e-poçt təsdiqi, Realtime websocket və admin bloklama/silmə real Supabase-də sınanmayıb. Miqrasiya heç bir test və ya production bazasında icra edilməyib.
 
-**19 interaksiya yoxlaması:** hamburger menyu (açılır, keçid sonrası bağlanır); klaviatura “əsas məzmuna keç”; ana səhifənin canlı bölmələri və CTA; production-da boş reklam yeri göstərilmir; auth tabı, parolu göstər/gizlət, razılıqsız göndərmə xətası; kitablar (6 kart, mobil filtr, axtarış sorğusu, favori `aria-pressed`); sınaq axını (səhv cavab + izah, tam axın, nəticə RPC ilə göndərilir, klient `correct_index` sorğulamır, birbaşa INSERT yoxdur); çat (siyahı → söhbət → göndərmə → geri); kabinet (sınaq tarixçəsi, silmə modalı: təsdiqsiz düymə söndürülüb, Esc bağlayır); desktop profil menyusu və oxunmamış nişanı.
+- `npm run lint`: 0 xəta, 11 xəbərdarlıq (React effect qaydası; layihənin əvvəlki səhifələrində mövcud xəbərdarlıqlar).
+- `npm run build`: uğurlu, 18 Next.js marşrutu yaradıldı; TypeScript mərhələsi də uğurla tamamlandı.
+- `cd tests/db && npm test`: 75 mövcud SQL testi və 56 yeni forum/admin testi keçdi; cəmi 131 keçən test, 0 uğursuz.
+- Paket quraşdırılması zamanı npm audit 7 orta səviyyəli dependency xəbərdarlığı göstərdi. Bu işdə dependency versiyaları dəyişdirilməyib.
 
-**Test zamanı tapılıb düzəldilən xətalar:** `DESIGN_UPDATE_REPORT.md`, 5-ci bölmə (modal fokusu, bildiriş rəngləri, çat scroll-u, kontrast).
+## Kod səviyyəsində yoxlanılanlar
 
-## 2. Yalnız kod səviyyəsində yoxlanılanlar (işləyən mühitdə sınanmayıb)
-Real Supabase ilə qeydiyyat/giriş/şifrə bərpası e-poçtları, real fayl yükləmə (Storage), RLS qaydalarının real bazada davranışı, hesab silmə (real `delete_my_account`). SQL məntiqi isə PGlite-da 117 testlə sınanıb.
+- Kateqoriya, mövzu, cavab, şikayət, daxili bildiriş, audit log və `platform_admins` cədvəllərinə RLS əlavə olunub.
+- Forum yazılarında müəllif ID-si, mətn uzunluğu, saatlıq limit və təkrar məzmun DB trigger-lərində yoxlanılır.
+- Admin API hər sorğuda access token-i yoxlayıb `platform_admins` ilə tutuşdurur. Service key yalnız server mühitində tələb olunur.
+- Admin icazəsi profil e-poçtuna və ya `profiles.role` sahəsinə əsaslanmır. Admin hesabı təsdiqlənəndən sonra ayrıca SQL ilə reyestrə əlavə edilməlidir.
+- Admin service key verilmədikdə istifadəçi idarəetmə API-si `503` qaytarır; service key brauzerə göndərilmir.
 
-## 3. Sınanmayıb
-- Real Supabase: Realtime websocket (yalnız UI məntiqi sınanıb; saxta serverdə websocket yoxdur və bu xəbərdarlıqlar süzülüb), e-poçt təsdiqi, real Storage.
-- Real AdSense reklamı (yalnız ID-lərin düzgün formatda işləndiyi sandbox-da saxta ID ilə yoxlanılıb, bu ID-lər ZIP-də yoxdur).
-- Real telefonlar, Safari, Firefox, Edge; Lighthouse nəticələri; zəif şəbəkə sınağı.
-- `Content-Security-Policy-Report-Only` mesajları: saxta `http://localhost` Supabase ünvanı səbəbilə sandbox-da çıxır, real `https://*.supabase.co` ilə çıxmamalıdır, amma yoxlanılmayıb.
+## Məhdudiyyətlər
 
-## 4. Qalan problemlər və əl ilə addımlar
-Yerləşdirmədən sonra `DEPLOY.md` 6-cı bölmədəki yoxlama siyahısını **real telefonda və kompüterdə** keçin. Reklam əlavə etdikdən sonra brauzer konsolunda CSP xəbərdarlıqlarına baxıb siyasəti tam rejimə keçirə bilərsiniz.
+- Forum fayl əlavələri və tam mətn üzrə DB axtarışı daxil edilməyib. Admin istifadəçi siyahısı Auth API-nin ilk 100 hesabı ilə məhdudlaşır. Admin reyestrini idarə etmək üçün UI yoxdur.
+- Super Admin təyini e-poçtu təsdiqlənmiş Auth hesabı tələb edir.
+- PGlite testləri real Supabase layihəsini əvəz etmir. İki hesabla Supabase RLS/Realtime, e-poçt və mobil brauzer yoxlamaları ayrıca Supabase/Vercel test mühitində aparılmalıdır.

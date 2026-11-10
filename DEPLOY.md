@@ -3,11 +3,13 @@
 Bu sənəd addım-addımdır. Heç bir addım avtomatik icra olunmur; hər birini siz özünüz edirsiniz.
 Production sayta və real verilənlər bazasına toxunmazdan əvvəl 1–3-cü addımları edin.
 
-## Əvvəlcə bunu oxuyun: v4.0 yalnız dizayn yeniləməsidir
-- Verilənlər bazasında **heç nə dəyişmir**. Əgər `01`, `02`, `04`, `05` (və lazım olsa `03`) SQL faylları artıq işlədilibsə, **yeni SQL işlətmək lazım deyil**: yalnız kodu yeniləyin (4-cü bölmə).
+## Forum / istifadəçi tipləri / admin yeniləməsi
+- Bu yeniləmə `06_forum_roles_admin.sql` miqrasiyasını əlavə edir. Production bazasında miqrasiya tətbiq edilmədən forum və admin API işləməyəcək.
+- Test bazasında ardıcıllıq: `01` → `02` → `04` → `05` → `06` → tətbiqi yoxlayın → `03`. Production-da əvvəl kodu yerləşdirib yoxlayın, sonra `06` miqrasiyasını tətbiq edin; `03` işlədilməyibsə, sonda tətbiq edin.
+- Əvvəl ehtiyat nüsxə alın və SQL-i test mühitində yoxlayın. SQL production-da avtomatik icra edilmir.
 - Əvvəlki dizayna qayıtmaq üçün: Vercel → Deployments → əvvəlki yerləşdirmə → Promote to Production (və ya `tehsilhub-nextjs-v3.2.zip`).
 - Dizayn və testlər haqqında: `DESIGN_UPDATE_REPORT.md`, `TEST_REPORT.md`. Ekran görüntüləri: `screenshots/`.
-- Yeni mühit dəyişəni yoxdur. `.env.example` yalnız dəyişən adlarını saxlayır.
+- Yeni server mühit dəyişəni `SUPABASE_SERVICE_ROLE_KEY`-dir; admin istifadəçi API-si üçün Vercel-də server-only kimi təyin edin. Dəyişənlərin tam siyahısı `.env.example` faylındadır.
 
 ## 0. Nə dəyişib (təhlükəsizlik yeniləməsi, v3)
 - Next.js 16 və React 19 (təhlükəsizlik yamaqları), `sitemap.xml`, `robots.txt`, 404/500 səhifələri, SEO metadata.
@@ -24,7 +26,7 @@ Production sayta və real verilənlər bazasına toxunmazdan əvvəl 1–3-cü a
 
 ## 2. Əvvəlcə test mühitində yoxlayın (tövsiyə olunur)
 Real məlumata toxunmadan sınamaq üçün ikinci pulsuz Supabase layihəsi yaradın (məs. `tehsilhub-test`):
-1. SQL Editor-da ardıcıl işlədin: `01_supabase_schema.sql` → `02_hardening_phase1.sql` → `04_grants.sql` → `05_backfill_profiles.sql` → `03_hardening_phase2.sql`.
+1. SQL Editor-da ardıcıl işlədin: `01_supabase_schema.sql` → `02_hardening_phase1.sql` → `04_grants.sql` → `05_backfill_profiles.sql` → `06_forum_roles_admin.sql`.
 2. Vercel-də repo-dan yeni branch (`v3`) üçün Preview yerləşdirmə yaradın və Preview mühit dəyişənlərinə test layihənin URL və anon key-ni yazın.
 3. Preview linkində yoxlama siyahısı (aşağıda, 6-cı bölmə) edin. Yalnız bundan sonra production-a keçin.
 
@@ -35,7 +37,8 @@ Real məlumata toxunmadan sınamaq üçün ikinci pulsuz Supabase layihəsi yara
 2. `02_hardening_phase1.sql` işlədin. Bu mərhələ köhnə (v2) saytı pozmur, məlumat silmir və dəyişmir. Xəta olarsa avtomatik geri qayıdır.
 3. `04_grants.sql` işlədin. **Yeni Supabase layihələrində (30 may 2026-dan sonra yaradılmış) bu mütləqdir:** Supabase cədvəllərə avtomatik icazə vermir və bu fayl olmadan sayt "permission denied for table ..." xətası verir (PDF yükləmə, elan, favori və s. işləmir). Yalnız icazə əlavə edir, məlumata toxunmur, təkrar işlədilə bilər.
 4. `05_backfill_profiles.sql` işlədin: trigger qurulmamışdan əvvəl qeydiyyatdan keçmiş istifadəçilərə profil yaradır. Bu olmadan onlar elan, PDF və ya favori əlavə edəndə `...violates foreign key constraint` xətası alırlar. Sonda nəticə `0` olmalıdır.
-5. **Hələ 03-ü işlətməyin.**
+5. `06_forum_roles_admin.sql` işlədin. Forum və istifadəçi tipi strukturları əlavə edilir; mövcud production məlumatı silinmir.
+6. Yeni versiyanı yerləşdirib yoxladıqdan sonra `03_hardening_phase2.sql` işlədin. `03`-ü `06`-dan sonra işlədin ki, `user_type` profilinin oxunma icazəsi qalsın.
 
 ## 4. Production saytı yeniləmək
 1. Zip-in məzmununu repoya köçürün (`node_modules`, `.next`, `.env*` repoda olmamalıdır) və push edin.
@@ -62,11 +65,13 @@ Real məlumata toxunmadan sınamaq üçün ikinci pulsuz Supabase layihəsi yara
 10. Brauzer konsolunda (F12 → Console) qırmızı xəta olmamalıdır. `Content-Security-Policy-Report-Only` xəbərdarlıqları reklam əlavə olunana qədər normaldır.
 
 ## 7. Admin təyin etmək
-Qeydiyyatdan sonra SQL Editor-da: `update public.profiles set role='admin' where id = (select id from auth.users where email='SİZİN_EPOÇT');`
+Əvvəlcə `elielizade17@gmail.com` ilə adi qeydiyyat yaradıb e-poçtu təsdiqləyin. Sonra [ADMIN_SETUP.md](ADMIN_SETUP.md) sənədindəki SQL ilə həmin hesabı `platform_admins` cədvəlinə əlavə edin. `profiles.role='admin'` işlətməyin. Vercel-də server tərəfli `SUPABASE_SERVICE_ROLE_KEY` dəyişənini qurun; adını `NEXT_PUBLIC_` ilə başlamayın.
+
+`06_forum_roles_admin.sql` miqrasiyasının forum məlumatını silən avtomatik rollback-i yoxdur. `99_rollback.sql` bu miqrasiya üçün rollback deyil. Əvvəlki versiyaya qayıtmaq lazım olsa, əvvəlki deploy-u bərpa edin; forum cədvəllərini məlumatları yoxlamadan silməyin.
 
 ## 8. Geri qayıtmaq
 - Sayt: Vercel → Deployments → əvvəlki yerləşdirmə → Promote to Production.
-- Verilənlər bazası: `99_rollback.sql` işlədin (04-ün icazələri qalır, zərərsizdir). Elan, PDF, mesaj, nəticə kimi istifadəçi məlumatına toxunmur. Yalnız yeni əlavə olunan köməkçi cədvəl/sütun silinir.
+- Verilənlər bazası: `99_rollback.sql` yalnız əvvəlki v3 mərhələlərinin rollback faylıdır; onu `06_forum_roles_admin.sql` üçün işlətməyin. Yeni forum cədvəlləri və istifadəçi yazıları saxlanılır. 06-nı geri qaytarmaq üçün ayrıca, məlumatı yoxlayan migration tələb olunur.
 - Silinmiş istifadəçi hesabları geri qaytarılmır (yalnız Supabase ehtiyat nüsxəsindən).
 
 ## 9. AdSense (real məlumatlar olanda)

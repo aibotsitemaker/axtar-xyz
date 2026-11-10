@@ -16,6 +16,12 @@ grant select (id, quiz_id, position, question_text, options, created_at)
 revoke select on public.profiles from anon, authenticated;
 grant select (id, full_name, username, avatar_url, city, bio, created_at)
     on public.profiles to anon, authenticated;
+-- Forum migration adds user_type; keep phase 2 compatible with older databases too.
+do $$ begin
+    if exists (select 1 from information_schema.columns where table_schema='public' and table_name='profiles' and column_name='user_type') then
+        grant select (user_type) on public.profiles to anon, authenticated;
+    end if;
+end $$;
 
 -- Nəticə və söhbət yalnız təhlükəsiz funksiyalarla yaradılır (saxta nəticə və spam söhbətlərin qarşısı)
 drop policy if exists "quiz_attempts_insert_own" on public.quiz_attempts;
