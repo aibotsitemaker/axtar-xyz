@@ -167,6 +167,14 @@ ok('order 04 -> 02 -> 03: upload still works', (await val(d2, `select count(*)::
   await q(forum, A, 'authenticated', `update profiles set user_type='teacher' where id='${A}'`);
   ok('user type: profile owner cannot change their own type after signup', (await val(forum, `select user_type from profiles where id='${A}'`))[0].user_type === 'student');
   await forum.exec(`insert into platform_admins(user_id) values ('${A}')`);
+  await q(forum, A, 'authenticated', `insert into admin_user_notes(user_id,admin_id,note) values ('${B}','${A}','Daxili yoxlama qeydi')`);
+  ok('admin user notes: only admins can read notes', (await q(forum, A, 'authenticated', `select note from admin_user_notes where user_id='${B}'`)).rows[0].note === 'Daxili yoxlama qeydi');
+  ok('admin user notes: regular users cannot read notes', (await q(forum, B, 'authenticated', `select * from admin_user_notes`)).rows.length === 0);
+  const managedQuiz = (await val(forum, `select id from quizzes limit 1`))[0].id;
+  await q(forum, null, 'service_role', `select admin_replace_quiz_questions('${managedQuiz}','[{"question_text":"Yeni test sualı","options":["A","B"],"correct_index":1}]'::jsonb)`);
+  ok('admin quiz questions: service operation replaces validated draft questions', (await val(forum, `select count(*)::int c from quiz_questions where quiz_id='${managedQuiz}'`))[0].c === 1);
+  await forum.exec(`insert into quiz_attempts(quiz_id,user_id) values ('${managedQuiz}','${A}')`);
+  await expectFail('admin quiz questions: question changes are blocked after attempts exist', forum, null, 'service_role', `select admin_replace_quiz_questions('${managedQuiz}','[{"question_text":"Dəyişiklik","options":["A","B"],"correct_index":0}]'::jsonb)`, /tarixçəsi qorunur/);
   await q(forum, A, 'authenticated', `update forum_topics set is_pinned=true where id='${topicId}'`);
   ok('admin registry permits moderation and records audit', (await val(forum, `select count(*)::int c from admin_audit_log where target_id='${topicId}'`))[0].c === 1);
   await q(forum, A, 'authenticated', `insert into forum_reports(reporter_id,topic_id,reason) values ('${A}','${topicId}','Yoxlanması xahiş edilən uyğun olmayan məzmun')`);

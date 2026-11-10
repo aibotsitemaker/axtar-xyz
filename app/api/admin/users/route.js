@@ -26,9 +26,22 @@ export async function GET(req) {
   try { auth = await adminFor(req); } catch (e) { return NextResponse.json({ error: e.message }, { status: 503 }); }
   if (auth.error) return NextResponse.json({ error: auth.error }, { status: auth.status });
   const params = new URL(req.url).searchParams;
+  const profileId = params.get('userId');
+  if (profileId) {
+    const [{ data: authUser, error: authError }, { data: profile, error: profileError }, { data: notes, error: notesError }] = await Promise.all([
+      auth.admin.auth.admin.getUserById(profileId),
+      auth.admin.from('profiles').select('id,user_type,city,bio,username,created_at').eq('id', profileId).maybeSingle(),
+      auth.admin.from('admin_user_notes').select('id,admin_id,note,created_at').eq('user_id', profileId).order('created_at', { ascending: false }).limit(100)
+    ]);
+    if (authError || profileError || notesError) return NextResponse.json({ error: authError?.message || profileError?.message || notesError?.message }, { status: 500 });
+    if (!authUser?.user || !profile) return NextResponse.json({ error: 'İstifadəçi tapılmadı' }, { status: 404 });
+    return NextResponse.json({ profile: { ...profile, email: authUser.user.email, full_name: authUser.user.user_metadata?.full_name || '', email_confirmed: Boolean(authUser.user.email_confirmed_at), created_at: authUser.user.created_at, banned_until: authUser.user.banned_until || null }, notes: notes || [] });
+  }
   const query = params.get('q')?.trim().toLowerCase() || '';
   const requestedType = params.get('type') || 'all';
   const userType = ['teacher', 'student', 'university_student'].includes(requestedType) ? requestedType : 'all';
+  const dateFrom = /^\d{4}-\d{2}-\d{2}$/.test(params.get('from') || '') ? params.get('from') : '';
+  const dateTo = /^\d{4}-\d{2}-\d{2}$/.test(params.get('to') || '') ? params.get('to') : '';
   const page = Math.max(1, Math.min(400, Number.parseInt(params.get('page') || '1', 10) || 1));
   const sort = params.get('sort') === 'created_asc' ? 'created_asc' : 'created_desc';
   const pageSize = 25;
@@ -51,8 +64,11 @@ export async function GET(req) {
       const fullName = u.user_metadata?.full_name || '';
       const profile = profileMap[u.id] || {};
       const type = profile.user_type || 'student';
+      const createdDay = (u.created_at || '').slice(0, 10);
       if (query && !`${u.email || ''} ${fullName}`.toLowerCase().includes(query)) continue;
       if (userType !== 'all' && type !== userType) continue;
+      if (dateFrom && createdDay < dateFrom) continue;
+      if (dateTo && createdDay > dateTo) continue;
       matches.push({ id: u.id, email: u.email, full_name: fullName, user_type: type, city: profile.city || '', bio: profile.bio || '', username: profile.username || '', created_at: u.created_at, email_confirmed: Boolean(u.email_confirmed_at), banned_until: u.banned_until || null });
     }
     const exhausted = responses.some((r) => r.data.users.length < 100);
@@ -62,6 +78,23 @@ export async function GET(req) {
   }
   matches.sort((a, b) => (sort === 'created_asc' ? 1 : -1) * (new Date(a.created_at) - new Date(b.created_at)));
   return NextResponse.json({ users: matches.slice(offset, offset + pageSize), page, hasMore: matches.length > offset + pageSize || !scannedAll, scannedLimit: scanPage > maxPages && !scannedAll });
+}
+
+export async function POST(req) {
+  let auth;
+  try { auth = await adminFor(req); } catch (e) { return NextResponse.json({ error: e.message }, { status: 503 }); }
+  if (auth.error) return NextResponse.json({ error: auth.error }, { status: auth.status });
+  const body = await req.json().catch(() => null);
+  const userId = body?.userId;
+  const note = typeof body?.note === 'string' ? body.note.trim() : '';
+  if (!userId || note.length < 1 || note.length > 2000) return NextResponse.json({ error: 'Qeyd 1–2000 simvol olmalıdır' }, { status: 400 });
+  const { data: exists, error: userError } = await auth.admin.auth.admin.getUserById(userId);
+  if (userError || !exists.user) return NextResponse.json({ error: 'İstifadəçi tapılmadı' }, { status: 404 });
+  const { data, error } = await auth.admin.from('admin_user_notes').insert({ user_id: userId, admin_id: auth.actor.id, note }).select('id,admin_id,note,created_at').single();
+  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  const audited = await auth.admin.from('admin_audit_log').insert({ actor_id: auth.actor.id, action: 'create_note', target_type: 'auth_user', target_id: userId, summary: { note_id: data.id } });
+  if (audited.error) return NextResponse.json({ error: 'Qeyd saxlanıldı, audit qeydi yazılmadı.' }, { status: 500 });
+  return NextResponse.json({ note: data }, { status: 201 });
 }
 
 export async function PATCH(req) {

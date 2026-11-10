@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { supabase } from '../../lib/supabase';
 import Icon from '../../components/Icons';
 import { Alert, Spinner } from '../../components/ui';
+import { syncAdminCookie } from '../../components/AuthProvider';
 
 export default function AuthPage() {
   const router = useRouter();
@@ -35,11 +36,12 @@ export default function AuthPage() {
         if (password.length < 8) throw new Error('Parol ən azı 8 simvol olmalıdır.');
         const { data, error } = await supabase.auth.signUp({ email, password, options: { data: { full_name: name, user_type: userType } } });
         if (error) throw error;
-        if (data.session) router.push('/profile');
+        if (data.session) { await syncAdminCookie(data.session.access_token); router.push('/profile'); }
         else setMsg({ type: 'success', text: 'Qeydiyyat uğurludur. E-poçtunuza göndərilən təsdiq linkinə klikləyin.' });
       } else {
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        const { data, error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
+        await syncAdminCookie(data.session?.access_token);
         router.push('/profile');
       }
     } catch (err) {

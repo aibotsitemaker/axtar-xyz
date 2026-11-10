@@ -15,15 +15,23 @@ export function AuthProvider({ children }) {
     supabase.auth.getSession().then(({ data }) => {
       setUser(data.session?.user ?? null);
       setLoading(false);
+      syncAdminCookie(data.session?.access_token);
     });
     const { data: sub } = supabase.auth.onAuthStateChange((_e, session) => {
       setUser(session?.user ?? null);
       setLoading(false);
+      syncAdminCookie(session?.access_token);
     });
     return () => sub.subscription.unsubscribe();
   }, []);
 
   return <Ctx.Provider value={{ user, loading }}>{children}</Ctx.Provider>;
+}
+
+export async function syncAdminCookie(token) {
+  try {
+    await fetch('/api/admin/session', { method: 'POST', headers: token ? { Authorization: `Bearer ${token}` } : {} });
+  } catch { /* The protected page also verifies the cookie and the admin APIs check every request. */ }
 }
 
 export function LoginPrompt({ text = 'Bu bölmədən istifadə üçün daxil olun.' }) {

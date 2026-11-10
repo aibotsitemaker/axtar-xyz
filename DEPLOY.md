@@ -1,4 +1,4 @@
-# Təhlükəsiz yeniləmə planı (TəhsilHub v4.0 — mavi-ağ dizayn)
+# Təhlükəsiz yeniləmə planı (TəhsilHub v4.2 — forum və admin)
 
 Bu sənəd addım-addımdır. Heç bir addım avtomatik icra olunmur; hər birini siz özünüz edirsiniz.
 Production sayta və real verilənlər bazasına toxunmazdan əvvəl 1–3-cü addımları edin.
@@ -10,6 +10,7 @@ Production sayta və real verilənlər bazasına toxunmazdan əvvəl 1–3-cü a
 - Əvvəlki dizayna qayıtmaq üçün: Vercel → Deployments → əvvəlki yerləşdirmə → Promote to Production (və ya `tehsilhub-nextjs-v3.2.zip`).
 - Dizayn və testlər haqqında: `DESIGN_UPDATE_REPORT.md`, `TEST_REPORT.md`. Ekran görüntüləri: `screenshots/`.
 - Yeni server mühit dəyişəni `SUPABASE_SERVICE_ROLE_KEY`-dir; admin istifadəçi API-si üçün Vercel-də server-only kimi təyin edin. Dəyişənlərin tam siyahısı `.env.example` faylındadır.
+- `/admin` girişini server layout-u da qoruyur: girişdən sonra server yalnız `platform_admins` reyestrindəki istifadəçiyə qısaömürlü `HttpOnly` cookie verir. `SUPABASE_SERVICE_ROLE_KEY` verilməsə, admin səhifəsi/API aktiv olmayacaq.
 
 ## 0. Nə dəyişib (təhlükəsizlik yeniləməsi, v3)
 - Next.js 16 və React 19 (təhlükəsizlik yamaqları), `sitemap.xml`, `robots.txt`, 404/500 səhifələri, SEO metadata.

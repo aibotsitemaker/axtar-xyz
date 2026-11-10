@@ -33,13 +33,23 @@ async function audit(db, actor, action, targetType, targetId, summary = {}) {
   return db.from('admin_audit_log').insert({ actor_id: actor.id, action, target_type: targetType, target_id: String(targetId), summary });
 }
 
+function storagePathFromPublicUrl(value, bucket) {
+  if (typeof value !== 'string') return null;
+  try {
+    const marker = `/storage/v1/object/public/${bucket}/`;
+    const url = new URL(value);
+    const index = url.pathname.indexOf(marker);
+    return index < 0 ? null : decodeURIComponent(url.pathname.slice(index + marker.length));
+  } catch { return null; }
+}
+
 export async function GET(req) {
   let auth;
   try { auth = await authorize(req); } catch (e) { return NextResponse.json({ error: e.message }, { status: 503 }); }
   if (auth.error) return NextResponse.json({ error: auth.error }, { status: auth.status });
   const kind = new URL(req.url).searchParams.get('kind') || 'quiz';
   if (kind === 'quiz') {
-    const { data, error } = await auth.db.from('quizzes').select('id,title,description,category,duration_seconds,is_published,created_at,quiz_questions(count)').order('created_at', { ascending: false }).limit(1000);
+    const { data, error } = await auth.db.from('quizzes').select('id,title,description,category,duration_seconds,is_published,created_at,quiz_questions(id,position,question_text,options,correct_index,explanation)').order('created_at', { ascending: false }).limit(1000);
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     return NextResponse.json({ items: data || [] });
   }
@@ -94,6 +104,7 @@ export async function PATCH(req) {
     if (patch.duration_seconds !== undefined && (!Number.isInteger(patch.duration_seconds) || patch.duration_seconds < 30 || patch.duration_seconds > 14400)) return NextResponse.json({ error: 'Müddət yanlışdır' }, { status: 400 });
     if (patch.description !== undefined && typeof patch.description !== 'string') return NextResponse.json({ error: 'Təsvir yanlışdır' }, { status: 400 });
     if (patch.is_published !== undefined && typeof patch.is_published !== 'boolean') return NextResponse.json({ error: 'Status yanlışdır' }, { status: 400 });
+    if (body.questions !== undefined && (!Array.isArray(body.questions) || body.questions.length < 1 || body.questions.length > 100 || !body.questions.every(validateQuestion))) return NextResponse.json({ error: 'Sual siyahısı yanlışdır (1–100 sual; hər sualda 2–6 cavab variantı)' }, { status: 400 });
   } else {
     if (patch.title !== undefined && (typeof patch.title !== 'string' || patch.title.trim().length < 2 || patch.title.length > 200)) return NextResponse.json({ error: 'Sənəd başlığı yanlışdır' }, { status: 400 });
     if (patch.content !== undefined && (typeof patch.content !== 'string' || patch.content.length < 1 || patch.content.length > 100000)) return NextResponse.json({ error: 'Sənəd mətni yanlışdır' }, { status: 400 });
@@ -102,9 +113,47 @@ export async function PATCH(req) {
     if (patch.is_active !== undefined && typeof patch.is_active !== 'boolean') return NextResponse.json({ error: 'Status yanlışdır' }, { status: 400 });
   }
   const table = body.kind === 'quiz' ? 'quizzes' : 'privacy_policy_terms';
+  if (body.kind === 'quiz' && body.questions) {
+    const { error: questionError } = await auth.db.rpc('admin_replace_quiz_questions', { p_quiz_id: body.id, p_questions: body.questions });
+    if (questionError) return NextResponse.json({ error: questionError.message }, { status: questionError.message.includes('tarixçəsi') ? 409 : 400 });
+  }
   const { error } = await auth.db.from(table).update(patch).eq('id', body.id);
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
   const result = await audit(auth.db, auth.actor, 'update', body.kind, body.id, { fields: Object.keys(patch) });
   if (result.error) return NextResponse.json({ error: 'Dəyişiklik saxlanıldı, lakin audit qeydi yazılmadı. Administratora bildirin.' }, { status: 500 });
+  if (body.kind === 'quiz' && body.questions) {
+    const questionAudit = await audit(auth.db, auth.actor, 'replace_questions', 'quiz', body.id, { question_count: body.questions.length });
+    if (questionAudit.error) return NextResponse.json({ error: 'Sual dəyişiklikləri saxlanıldı, lakin audit qeydi yazılmadı.' }, { status: 500 });
+  }
+  return NextResponse.json({ ok: true });
+}
+
+export async function DELETE(req) {
+  let auth;
+  try { auth = await authorize(req); } catch (e) { return NextResponse.json({ error: e.message }, { status: 503 }); }
+  if (auth.error) return NextResponse.json({ error: auth.error }, { status: auth.status });
+  const body = await req.json().catch(() => null);
+  if (!body?.id || !['book', 'pdf', 'quiz'].includes(body.kind)) return NextResponse.json({ error: 'Silinəcək məzmun seçilməyib' }, { status: 400 });
+  const table = body.kind === 'book' ? 'books' : body.kind === 'pdf' ? 'pdfs' : 'quizzes';
+  if (body.kind === 'quiz') {
+    const { count, error } = await auth.db.from('quiz_attempts').select('*', { count: 'exact', head: true }).eq('quiz_id', body.id);
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    if (count) return NextResponse.json({ error: 'Cavab tarixçəsi olan sınaq silinmir; nəticələri qorumaq üçün gizlədin.' }, { status: 409 });
+  }
+  const select = body.kind === 'book' ? 'id,image_urls' : body.kind === 'pdf' ? 'id,file_url' : 'id';
+  const { data: row, error: readError } = await auth.db.from(table).select(select).eq('id', body.id).maybeSingle();
+  if (readError) return NextResponse.json({ error: readError.message }, { status: 500 });
+  if (!row) return NextResponse.json({ error: 'Məzmun tapılmadı' }, { status: 404 });
+  const { error } = await auth.db.from(table).delete().eq('id', body.id);
+  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  const logged = await audit(auth.db, auth.actor, 'delete', body.kind, body.id);
+  if (logged.error) return NextResponse.json({ error: 'Məzmun silindi, audit qeydi yazılmadı.' }, { status: 500 });
+  const urls = body.kind === 'book' ? row.image_urls || [] : body.kind === 'pdf' ? [row.file_url] : [];
+  const bucket = body.kind === 'book' ? 'book-images' : 'pdf-files';
+  const paths = urls.map((url) => storagePathFromPublicUrl(url, bucket)).filter(Boolean);
+  if (paths.length) {
+    const removed = await auth.db.storage.from(bucket).remove(paths);
+    if (removed.error) return NextResponse.json({ ok: true, warning: 'Məzmun silindi, lakin Storage fayllarının bir hissəsi təmizlənmədi.' });
+  }
   return NextResponse.json({ ok: true });
 }
