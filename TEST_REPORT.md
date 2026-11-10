@@ -4,9 +4,9 @@
 
 Bu mühitdə forum, istifadəçi tipləri, admin API və miqrasiya üçün real Supabase giriş məlumatları olmadığından DB inteqrasiyası, iki istifadəçi ilə RLS yoxlaması, e-poçt təsdiqi, Realtime websocket və admin bloklama/silmə real Supabase-də sınanmayıb. Miqrasiya heç bir test və ya production bazasında icra edilməyib.
 
-- `npm run lint`: 0 xəta, 11 xəbərdarlıq (React effect qaydası; layihənin əvvəlki səhifələrində mövcud xəbərdarlıqlar).
-- `npm run build`: uğurlu, 18 Next.js marşrutu yaradıldı; TypeScript mərhələsi də uğurla tamamlandı.
-- `cd tests/db && npm test`: 75 mövcud SQL testi və 56 yeni forum/admin testi keçdi; cəmi 131 keçən test, 0 uğursuz.
+- `npm run lint`: 0 xəta, 11 React effect xəbərdarlığı.
+- `npm run build`: uğurlu, TypeScript mərhələsi daxil olmaqla 18 Next.js marşrutu yaradıldı.
+- `cd tests/db && npm test`: 75 mövcud SQL testi və 61 yeni forum/admin testi; cəmi 136 keçən test, 0 uğursuz.
 - Paket quraşdırılması zamanı npm audit 7 orta səviyyəli dependency xəbərdarlığı göstərdi. Bu işdə dependency versiyaları dəyişdirilməyib.
 
 ## Kod səviyyəsində yoxlanılanlar
@@ -19,6 +19,6 @@ Bu mühitdə forum, istifadəçi tipləri, admin API və miqrasiya üçün real 
 
 ## Məhdudiyyətlər
 
-- Forum fayl əlavələri və tam mətn üzrə DB axtarışı daxil edilməyib. Admin istifadəçi siyahısı Auth API-nin ilk 100 hesabı ilə məhdudlaşır. Admin reyestrini idarə etmək üçün UI yoxdur.
+- Mövzu axtarışı DB-də alt-sətir uyğunluğuna əsaslanır, dilə uyğun leksik full-text indeks deyil. Admin reyestrini idarə etmək üçün UI yoxdur; ilkin Super Admin SQL ilə əlavə olunur.
 - Super Admin təyini e-poçtu təsdiqlənmiş Auth hesabı tələb edir.
 - PGlite testləri real Supabase layihəsini əvəz etmir. İki hesabla Supabase RLS/Realtime, e-poçt və mobil brauzer yoxlamaları ayrıca Supabase/Vercel test mühitində aparılmalıdır.

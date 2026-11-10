@@ -10,18 +10,24 @@ const roleLabel = { teacher: 'Müəllim', student: 'Şagird', university_student
 
 export default function TopicPage() {
   const { id } = useParams(); const router = useRouter(); const { user, loading } = useAuth();
-  const [topic, setTopic] = useState(null); const [replies, setReplies] = useState([]); const [authors, setAuthors] = useState({}); const [categories, setCategories] = useState([]);
+  const [topic, setTopic] = useState(null); const [replies, setReplies] = useState([]); const [authors, setAuthors] = useState({}); const [categories, setCategories] = useState([]); const [attachments, setAttachments] = useState([]);
   const [reply, setReply] = useState(''); const [replyParentId, setReplyParentId] = useState(''); const [editId, setEditId] = useState(''); const [editText, setEditText] = useState('');
   const [busy, setBusy] = useState(false); const [notice, setNotice] = useState({ type: '', text: '' }); const [editingTopic, setEditingTopic] = useState(false); const [editTitle, setEditTitle] = useState(''); const [editBody, setEditBody] = useState(''); const [editCategory, setEditCategory] = useState(''); const [adminState, setAdminState] = useState({ id: null, value: false });
   const isAdmin = adminState.id === user?.id && adminState.value;
   const load = useCallback(async () => {
-    const [t, r, c] = await Promise.all([
+    const [t, r, c, a] = await Promise.all([
       supabase.from('forum_topics').select('id,author_id,category_id,title,body,is_pinned,is_locked,created_at,updated_at,forum_categories(name)').eq('id', id).maybeSingle(),
       supabase.from('forum_replies').select('id,topic_id,author_id,parent_id,body,created_at,updated_at').eq('topic_id', id).is('deleted_at', null).order('created_at'),
-      supabase.from('forum_categories').select('id,name').eq('is_active', true).order('name')
+      supabase.from('forum_categories').select('id,name').eq('is_active', true).order('name'),
+      supabase.from('forum_attachments').select('id,storage_path,file_name,mime_type,size_bytes').eq('topic_id', id).order('created_at')
     ]);
     if (t.error || !t.data) { setTopic(null); setNotice({ type: 'error', text: 'Mövzu tapılmadı və ya yüklənmədi.' }); return; }
     const topicData = t.data; setTopic(topicData); setReplies(r.data || []); setCategories(c.data || []);
+    const signedFiles = await Promise.all((a.data || []).map(async (file) => {
+      const { data: signed } = await supabase.storage.from('tehsilhub-forum-files').createSignedUrl(file.storage_path, 3600);
+      return { ...file, download_url: signed?.signedUrl || '' };
+    }));
+    setAttachments(signedFiles);
     setEditTitle(topicData.title); setEditBody(topicData.body); setEditCategory(String(topicData.category_id));
     const ids = [...new Set([topicData.author_id, ...(r.data || []).map((x) => x.author_id)].filter(Boolean))];
     const p = await supabase.from('profiles').select('id,full_name,user_type').in('id', ids);
@@ -78,7 +84,7 @@ export default function TopicPage() {
     <article className="card mt-5 p-5 sm:p-7"><div className="mb-4 flex flex-wrap items-center justify-between gap-3 text-sm">
       <span className="font-semibold">{topicAuthor?.full_name || 'İstifadəçi'} {topicAuthor?.user_type && <span className="ml-2 rounded-full bg-primary-soft px-2 py-1 text-xs text-primary">{roleLabel[topicAuthor.user_type]}</span>}</span>
       {user && <div className="flex gap-2"><button className="btn btn-secondary btn-sm" onClick={() => report('topic', topic.id)}>Şikayət et</button>{user.id === topic.author_id && <button className="btn btn-secondary btn-sm" onClick={() => setEditingTopic(!editingTopic)}>Redaktə</button>}{(user.id === topic.author_id || isAdmin) && <button className="btn btn-danger btn-sm" onClick={removeTopic}>Sil</button>}</div>}
-    </div><p className="whitespace-pre-wrap break-words text-sm leading-7">{topic.body}</p></article>
+    </div><p className="whitespace-pre-wrap break-words text-sm leading-7">{topic.body}</p>{attachments.length > 0 && <div className="mt-5 border-t border-line pt-4"><h2 className="mb-2 text-sm font-semibold">Əlavələr ({attachments.length})</h2><ul className="space-y-2">{attachments.map((file) => <li key={file.id} className="flex items-center justify-between gap-3 rounded-lg bg-canvas px-3 py-2 text-sm"><a href={file.download_url || undefined} target="_blank" rel="noopener noreferrer" aria-disabled={!file.download_url} className="min-w-0 truncate font-medium text-primary hover:underline">{file.file_name}</a><span className="shrink-0 text-xs text-muted">{file.mime_type === 'application/pdf' ? 'PDF' : 'Şəkil'} · {Math.max(1, Math.ceil(file.size_bytes / 1024))} KB</span></li>)}</ul></div>}</article>
     {editingTopic && user?.id === topic.author_id && <form onSubmit={saveTopic} className="card mt-3 space-y-3 p-4"><label className="block"><span className="label">Başlıq</span><input className="input" minLength={8} maxLength={160} required value={editTitle} onChange={(e) => setEditTitle(e.target.value)} /></label><label className="block"><span className="label">Kateqoriya</span><select className="input" value={editCategory} onChange={(e) => setEditCategory(e.target.value)}>{categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></label><label className="block"><span className="label">Mətn</span><textarea className="input min-h-32" minLength={10} maxLength={12000} required value={editBody} onChange={(e) => setEditBody(e.target.value)} /></label><button className="btn btn-primary">Dəyişiklikləri yadda saxla</button></form>}
     <div className="mt-7"><h2 className="text-xl font-bold">Cavablar <span className="text-sm font-medium text-muted">({replies.length})</span></h2>
       <div className="mt-4 space-y-3">{!replies.length && <div className="card p-6 text-center text-sm text-muted">Hələ cavab yoxdur.</div>}

@@ -143,6 +143,14 @@ ok('order 04 -> 02 -> 03: upload still works', (await val(d2, `select count(*)::
   const cat = (await val(forum, `select id from forum_categories limit 1`))[0].id;
   await q(forum, A, 'authenticated', `insert into forum_topics(author_id,category_id,title,body) values ('${A}',${cat},'Müzakirə mövzusu','Bu mövzu üçün kifayət qədər ətraflı başlanğıc mətni var.')`);
   const topicId = (await val(forum, `select id from forum_topics`))[0].id;
+  await q(forum, A, 'authenticated', `insert into forum_attachments(topic_id,uploader_id,storage_path,file_name,mime_type,size_bytes) values ('${topicId}','${A}','${A}/${topicId}/one.png','one.png','image/png',1024)`);
+  ok('forum attachments: owner can attach a whitelisted image file', (await val(forum, `select count(*)::int c from forum_attachments where topic_id='${topicId}'`))[0].c === 1);
+  await q(forum, A, 'authenticated', `insert into storage.objects(bucket_id,name,owner) values ('tehsilhub-forum-files','${A}/${topicId}/one.png','${A}')`);
+  ok('forum attachments: storage object is visible to readers only through an active topic policy', (await q(forum, null, 'anon', `select count(*)::int c from storage.objects where name='${A}/${topicId}/one.png'`)).rows[0].c === 1);
+  await expectFail('forum attachments: another user cannot add a file to the topic', forum, B, 'authenticated', `insert into forum_attachments(topic_id,uploader_id,storage_path,file_name,mime_type,size_bytes) values ('${topicId}','${B}','${B}/${topicId}/bad.png','bad.png','image/png',1024)`, /new row violates row-level security|Əlavəni yalnız/);
+  await expectFail('forum attachments: unsafe MIME types are rejected', forum, A, 'authenticated', `insert into forum_attachments(topic_id,uploader_id,storage_path,file_name,mime_type,size_bytes) values ('${topicId}','${A}','${A}/${topicId}/bad.svg','bad.svg','image/svg+xml',1024)`, /check constraint|icazəli deyil/);
+  for (let i=2;i<=4;i++) await q(forum, A, 'authenticated', `insert into forum_attachments(topic_id,uploader_id,storage_path,file_name,mime_type,size_bytes) values ('${topicId}','${A}','${A}/${topicId}/${i}.png','${i}.png','image/png',1024)`);
+  await expectFail('forum attachments: fifth file per topic is rejected', forum, A, 'authenticated', `insert into forum_attachments(topic_id,uploader_id,storage_path,file_name,mime_type,size_bytes) values ('${topicId}','${A}','${A}/${topicId}/5.png','5.png','image/png',1024)`, /ən çox 4 fayl/);
   await q(forum, B, 'authenticated', `insert into forum_replies(topic_id,author_id,body) values ('${topicId}','${B}','Mənim cavabım, bu mövzunu müzakirəyə davam etdirək.')`);
   ok('forum: another signed-in user can reply and topic owner receives notification', (await val(forum, `select count(*)::int c from forum_notifications where user_id='${A}'`))[0].c === 1);
   ok('forum: anon reads public topic and stats RPC', (await q(forum, null, 'anon', `select * from forum_topic_stats(array['${topicId}']::uuid[])`)).rows[0].reply_count === 1);
@@ -165,7 +173,7 @@ ok('order 04 -> 02 -> 03: upload still works', (await val(d2, `select count(*)::
   await expectFail('forum report: duplicate reports from same user are limited', forum, A, 'authenticated', `insert into forum_reports(reporter_id,topic_id,reason) values ('${A}','${topicId}','Eyni hədəfə təkrar şikayət göndərirəm')`, /duplicate key|unique/i);
   await forum.exec(`delete from auth.users where id='${A}'`);
   const preserved = (await val(forum, `select (select count(*)::int from forum_topics where id='${topicId}' and author_id is null) topic_count, (select count(*)::int from forum_replies where topic_id='${topicId}') reply_count`))[0];
-  ok('forum: account deletion anonymizes author and preserves topic and replies', preserved.topic_count === 1 && preserved.reply_count === 30);
+  ok('forum: account deletion anonymizes author and preserves topic, replies and attachments', preserved.topic_count === 1 && preserved.reply_count === 30 && (await val(forum, `select count(*)::int c from forum_attachments where topic_id='${topicId}' and uploader_id is null`))[0].c === 4);
 }
 
 console.log(log.join('\n')); console.log(`\nTOTAL: ${pass} passed, ${fail} failed`); process.exit(fail ? 1 : 0);

@@ -85,6 +85,16 @@ create table if not exists public.forum_notifications (
   is_read boolean not null default false,
   created_at timestamptz not null default now()
 );
+create table if not exists public.forum_attachments (
+  id uuid primary key default gen_random_uuid(),
+  topic_id uuid not null references public.forum_topics(id) on delete cascade,
+  uploader_id uuid not null references public.profiles(id) on delete cascade,
+  storage_path text not null unique,
+  file_name text not null check (char_length(file_name) between 1 and 180),
+  mime_type text not null check (mime_type in ('image/jpeg','image/png','image/webp','application/pdf')),
+  size_bytes integer not null check (size_bytes between 1 and 5242880),
+  created_at timestamptz not null default now()
+);
 -- Preserve forum history when an account is removed; anonymize the author reference.
 alter table public.forum_topics drop constraint if exists forum_topics_author_id_fkey;
 alter table public.forum_topics alter column author_id drop not null;
@@ -92,6 +102,9 @@ alter table public.forum_topics add constraint forum_topics_author_id_fkey forei
 alter table public.forum_replies drop constraint if exists forum_replies_author_id_fkey;
 alter table public.forum_replies alter column author_id drop not null;
 alter table public.forum_replies add constraint forum_replies_author_id_fkey foreign key (author_id) references public.profiles(id) on delete set null;
+alter table public.forum_attachments drop constraint if exists forum_attachments_uploader_id_fkey;
+alter table public.forum_attachments alter column uploader_id drop not null;
+alter table public.forum_attachments add constraint forum_attachments_uploader_id_fkey foreign key (uploader_id) references public.profiles(id) on delete set null;
 alter table public.forum_reports drop constraint if exists forum_reports_reporter_id_fkey;
 alter table public.forum_reports alter column reporter_id drop not null;
 alter table public.forum_reports add constraint forum_reports_reporter_id_fkey foreign key (reporter_id) references public.profiles(id) on delete set null;
@@ -129,6 +142,7 @@ alter table public.forum_topics enable row level security;
 alter table public.forum_replies enable row level security;
 alter table public.forum_reports enable row level security;
 alter table public.forum_notifications enable row level security;
+alter table public.forum_attachments enable row level security;
 alter table public.admin_audit_log enable row level security;
 
 drop policy if exists forum_categories_read on public.forum_categories;
@@ -162,6 +176,17 @@ drop policy if exists forum_reports_admin_update on public.forum_reports;
 create policy forum_reports_admin_update on public.forum_reports for update to authenticated using (public.is_admin()) with check (public.is_admin());
 drop policy if exists forum_notifications_own on public.forum_notifications;
 create policy forum_notifications_own on public.forum_notifications for all to authenticated using (user_id=auth.uid()) with check (user_id=auth.uid());
+drop policy if exists forum_attachments_read on public.forum_attachments;
+create policy forum_attachments_read on public.forum_attachments for select using (
+  exists(select 1 from public.forum_topics t where t.id=topic_id and
+    ((t.deleted_at is null and exists(select 1 from public.forum_categories c where c.id=t.category_id and c.is_active)) or t.author_id=auth.uid() or public.is_admin()))
+);
+drop policy if exists forum_attachments_insert on public.forum_attachments;
+create policy forum_attachments_insert on public.forum_attachments for insert to authenticated with check (
+  uploader_id=auth.uid() and exists(select 1 from public.forum_topics t where t.id=topic_id and (t.author_id=auth.uid() or public.is_admin()))
+);
+drop policy if exists forum_attachments_delete on public.forum_attachments;
+create policy forum_attachments_delete on public.forum_attachments for delete to authenticated using (uploader_id=auth.uid() or public.is_admin());
 drop policy if exists admin_audit_read on public.admin_audit_log;
 create policy admin_audit_read on public.admin_audit_log for select to authenticated using (public.is_admin());
 
@@ -172,6 +197,8 @@ grant insert, update, delete on public.forum_categories to authenticated;
 grant insert, update, delete on public.forum_topics, public.forum_replies to authenticated;
 grant select, insert, update on public.forum_reports to authenticated;
 grant select, update on public.forum_notifications to authenticated;
+grant select on public.forum_attachments to anon, authenticated;
+grant insert, delete on public.forum_attachments to authenticated;
 grant select on public.admin_audit_log to authenticated;
 grant usage, select on sequence public.forum_categories_id_seq, public.admin_audit_log_id_seq to authenticated;
 
@@ -287,6 +314,39 @@ end; $$;
 drop trigger if exists forum_notifications_guard on public.forum_notifications;
 create trigger forum_notifications_guard before update on public.forum_notifications for each row execute function public.guard_forum_notification_update();
 
+create or replace function public.guard_forum_attachment_insert()
+returns trigger language plpgsql security definer set search_path=public,pg_temp as $$
+declare total integer;
+begin
+  if new.uploader_id<>auth.uid() and not public.is_admin() then raise exception 'Əlavəni yalnız öz hesabınızdan yükləyə bilərsiniz'; end if;
+  perform 1 from public.forum_topics where id=new.topic_id for update;
+  select count(*) into total from public.forum_attachments where topic_id=new.topic_id;
+  if total>=4 then raise exception 'Mövzuya ən çox 4 fayl əlavə etmək olar'; end if;
+  if new.size_bytes>5242880 or new.mime_type not in ('image/jpeg','image/png','image/webp','application/pdf') then raise exception 'Fayl növü və ya ölçüsü icazəli deyil'; end if;
+  new.created_at:=now(); return new;
+end; $$;
+drop trigger if exists forum_attachments_guard on public.forum_attachments;
+create trigger forum_attachments_guard before insert on public.forum_attachments for each row execute function public.guard_forum_attachment_insert();
+
+insert into storage.buckets(id,name,public,file_size_limit,allowed_mime_types)
+values ('tehsilhub-forum-files','tehsilhub-forum-files',false,5242880,array['image/jpeg','image/png','image/webp','application/pdf'])
+on conflict (id) do update set name=excluded.name, public=false, file_size_limit=excluded.file_size_limit, allowed_mime_types=excluded.allowed_mime_types;
+drop policy if exists forum_storage_public_read on storage.objects;
+drop policy if exists forum_storage_topic_read on storage.objects;
+create policy forum_storage_topic_read on storage.objects for select using (
+  bucket_id='tehsilhub-forum-files' and exists (
+    select 1 from public.forum_attachments fa join public.forum_topics ft on ft.id=fa.topic_id
+    where fa.storage_path=storage.objects.name and
+      ((ft.deleted_at is null and exists(select 1 from public.forum_categories fc where fc.id=ft.category_id and fc.is_active)) or ft.author_id=auth.uid() or public.is_admin())
+  )
+);
+drop policy if exists forum_storage_insert_own on storage.objects;
+create policy forum_storage_insert_own on storage.objects for insert to authenticated with check (bucket_id='tehsilhub-forum-files' and (storage.foldername(name))[1]=auth.uid()::text);
+drop policy if exists forum_storage_update_own on storage.objects;
+create policy forum_storage_update_own on storage.objects for update to authenticated using (bucket_id='tehsilhub-forum-files' and ((storage.foldername(name))[1]=auth.uid()::text or public.is_admin())) with check (bucket_id='tehsilhub-forum-files' and ((storage.foldername(name))[1]=auth.uid()::text or public.is_admin()));
+drop policy if exists forum_storage_delete_own on storage.objects;
+create policy forum_storage_delete_own on storage.objects for delete to authenticated using (bucket_id='tehsilhub-forum-files' and ((storage.foldername(name))[1]=auth.uid()::text or public.is_admin()));
+
 create or replace function public.notify_forum_reply()
 returns trigger language plpgsql security definer set search_path=public,pg_temp as $$
 declare owner_id uuid;
@@ -313,17 +373,25 @@ begin
   return coalesce(new,old);
 end; $$;
 drop trigger if exists forum_topics_audit on public.forum_topics;
-create trigger forum_topics_audit after update or delete on public.forum_topics for each row execute function public.admin_audit_forum();
+create trigger forum_topics_audit after insert or update or delete on public.forum_topics for each row execute function public.admin_audit_forum();
 drop trigger if exists forum_replies_audit on public.forum_replies;
 create trigger forum_replies_audit after update or delete on public.forum_replies for each row execute function public.admin_audit_forum();
 drop trigger if exists forum_reports_audit on public.forum_reports;
 create trigger forum_reports_audit after update on public.forum_reports for each row execute function public.admin_audit_forum();
 drop trigger if exists forum_categories_audit on public.forum_categories;
-create trigger forum_categories_audit after update or delete on public.forum_categories for each row execute function public.admin_audit_forum();
+create trigger forum_categories_audit after insert or update or delete on public.forum_categories for each row execute function public.admin_audit_forum();
 drop trigger if exists admin_books_audit on public.books;
-create trigger admin_books_audit after update or delete on public.books for each row execute function public.admin_audit_forum();
+create trigger admin_books_audit after insert or update or delete on public.books for each row execute function public.admin_audit_forum();
 drop trigger if exists admin_pdfs_audit on public.pdfs;
-create trigger admin_pdfs_audit after update or delete on public.pdfs for each row execute function public.admin_audit_forum();
+create trigger admin_pdfs_audit after insert or update or delete on public.pdfs for each row execute function public.admin_audit_forum();
+drop trigger if exists admin_quizzes_audit on public.quizzes;
+create trigger admin_quizzes_audit after insert or update or delete on public.quizzes for each row execute function public.admin_audit_forum();
+drop trigger if exists admin_quiz_questions_audit on public.quiz_questions;
+create trigger admin_quiz_questions_audit after insert or update or delete on public.quiz_questions for each row execute function public.admin_audit_forum();
+drop trigger if exists admin_legal_docs_audit on public.privacy_policy_terms;
+create trigger admin_legal_docs_audit after insert or update or delete on public.privacy_policy_terms for each row execute function public.admin_audit_forum();
+drop trigger if exists forum_attachments_audit on public.forum_attachments;
+create trigger forum_attachments_audit after delete on public.forum_attachments for each row execute function public.admin_audit_forum();
 
 create or replace function public.guard_forum_report()
 returns trigger language plpgsql security definer set search_path=public,pg_temp as $$

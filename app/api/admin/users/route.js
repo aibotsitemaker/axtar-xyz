@@ -25,14 +25,43 @@ export async function GET(req) {
   let auth;
   try { auth = await adminFor(req); } catch (e) { return NextResponse.json({ error: e.message }, { status: 503 }); }
   if (auth.error) return NextResponse.json({ error: auth.error }, { status: auth.status });
-  const query = new URL(req.url).searchParams.get('q')?.trim().toLowerCase() || '';
-  const { data, error } = await auth.admin.auth.admin.listUsers({ page: 1, perPage: 100 });
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  const users = data.users.filter((u) => !query || `${u.email || ''} ${u.user_metadata?.full_name || ''}`.toLowerCase().includes(query));
-  const ids = users.map((u) => u.id);
-  const { data: profiles } = ids.length ? await auth.admin.from('profiles').select('id,user_type').in('id', ids) : { data: [] };
-  const types = Object.fromEntries((profiles || []).map((p) => [p.id, p.user_type]));
-  return NextResponse.json({ users: users.map((u) => ({ id: u.id, email: u.email, full_name: u.user_metadata?.full_name || '', user_type: types[u.id] || 'student', created_at: u.created_at, email_confirmed: Boolean(u.email_confirmed_at), banned_until: u.banned_until || null })) });
+  const params = new URL(req.url).searchParams;
+  const query = params.get('q')?.trim().toLowerCase() || '';
+  const requestedType = params.get('type') || 'all';
+  const userType = ['teacher', 'student', 'university_student'].includes(requestedType) ? requestedType : 'all';
+  const page = Math.max(1, Math.min(400, Number.parseInt(params.get('page') || '1', 10) || 1));
+  const sort = params.get('sort') === 'created_asc' ? 'created_asc' : 'created_desc';
+  const pageSize = 25;
+  const offset = (page - 1) * pageSize;
+  const matches = [];
+  let scannedAll = false;
+  let scanPage = 1;
+  const maxPages = 100;
+  while (scanPage <= maxPages) {
+    const pageNumbers = Array.from({ length: Math.min(5, maxPages - scanPage + 1) }, (_, i) => scanPage + i);
+    const responses = await Promise.all(pageNumbers.map((n) => auth.admin.auth.admin.listUsers({ page: n, perPage: 100 })));
+    const failed = responses.find((r) => r.error);
+    if (failed) return NextResponse.json({ error: failed.error.message }, { status: 500 });
+    const batch = responses.flatMap((r) => r.data.users);
+    const ids = batch.map((u) => u.id);
+    const { data: profiles, error: profileError } = ids.length ? await auth.admin.from('profiles').select('id,user_type,city,bio,username').in('id', ids) : { data: [], error: null };
+    if (profileError) return NextResponse.json({ error: profileError.message }, { status: 500 });
+    const profileMap = Object.fromEntries((profiles || []).map((p) => [p.id, p]));
+    for (const u of batch) {
+      const fullName = u.user_metadata?.full_name || '';
+      const profile = profileMap[u.id] || {};
+      const type = profile.user_type || 'student';
+      if (query && !`${u.email || ''} ${fullName}`.toLowerCase().includes(query)) continue;
+      if (userType !== 'all' && type !== userType) continue;
+      matches.push({ id: u.id, email: u.email, full_name: fullName, user_type: type, city: profile.city || '', bio: profile.bio || '', username: profile.username || '', created_at: u.created_at, email_confirmed: Boolean(u.email_confirmed_at), banned_until: u.banned_until || null });
+    }
+    const exhausted = responses.some((r) => r.data.users.length < 100);
+    scanPage += pageNumbers.length;
+    if (exhausted) { scannedAll = true; break; }
+    if (sort === 'created_desc' && matches.length > offset + pageSize) break;
+  }
+  matches.sort((a, b) => (sort === 'created_asc' ? 1 : -1) * (new Date(a.created_at) - new Date(b.created_at)));
+  return NextResponse.json({ users: matches.slice(offset, offset + pageSize), page, hasMore: matches.length > offset + pageSize || !scannedAll, scannedLimit: scanPage > maxPages && !scannedAll });
 }
 
 export async function PATCH(req) {

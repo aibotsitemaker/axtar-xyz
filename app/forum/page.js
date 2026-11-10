@@ -24,6 +24,7 @@ export default function ForumPage() {
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
   const [categoryId, setCategoryId] = useState('');
+  const [files, setFiles] = useState([]);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState({ type: '', text: '' });
 
@@ -54,11 +55,25 @@ export default function ForumPage() {
     e.preventDefault(); setNotice({ type: '', text: '' });
     if (busy) return;
     if (!user) { router.push('/auth'); return; }
+    if (files.length > 4 || files.some((file) => file.size > 5 * 1024 * 1024 || !['image/jpeg', 'image/png', 'image/webp', 'application/pdf'].includes(file.type))) {
+      setNotice({ type: 'error', text: 'Ən çox 4 JPG, PNG, WEBP və ya PDF faylı seçin; hər biri 5 MB-dan kiçik olmalıdır.' }); return;
+    }
     setBusy(true);
-    const { error } = await supabase.from('forum_topics').insert({ author_id: user.id, category_id: Number(categoryId), title: title.trim(), body: body.trim() });
-    setBusy(false);
-    if (error) { setNotice({ type: 'error', text: error.message || 'Mövzu yaradılmadı.' }); return; }
-    setTitle(''); setBody(''); setCategoryId(''); setOpen(false); setNotice({ type: 'success', text: 'Mövzu yaradıldı.' }); await load();
+    const { data: topic, error } = await supabase.from('forum_topics').insert({ author_id: user.id, category_id: Number(categoryId), title: title.trim(), body: body.trim() }).select('id').single();
+    if (error) { setBusy(false); setNotice({ type: 'error', text: error.message || 'Mövzu yaradılmadı.' }); return; }
+    const uploaded = []; const metadata = [];
+    for (const file of files) {
+      const safeName = file.name.replace(/[^\p{L}\p{N}._-]+/gu, '_').slice(-150) || 'forum-file';
+      const storagePath = `${user.id}/${topic.id}/${crypto.randomUUID()}-${safeName}`;
+      const upload = await supabase.storage.from('tehsilhub-forum-files').upload(storagePath, file, { contentType: file.type, upsert: false });
+      if (upload.error) { if (uploaded.length) await supabase.storage.from('tehsilhub-forum-files').remove(uploaded); await supabase.from('forum_topics').update({ deleted_at: new Date().toISOString() }).eq('id', topic.id); setBusy(false); setNotice({ type: 'error', text: `Fayl yüklənmədi: ${upload.error.message}` }); return; }
+      uploaded.push(storagePath); metadata.push({ topic_id: topic.id, uploader_id: user.id, storage_path: storagePath, file_name: file.name.slice(0, 180), mime_type: file.type, size_bytes: file.size });
+    }
+    if (metadata.length) {
+      const saved = await supabase.from('forum_attachments').insert(metadata);
+      if (saved.error) { if (uploaded.length) await supabase.storage.from('tehsilhub-forum-files').remove(uploaded); await supabase.from('forum_topics').update({ deleted_at: new Date().toISOString() }).eq('id', topic.id); setBusy(false); setNotice({ type: 'error', text: `Fayl məlumatı saxlanmadı: ${saved.error.message}` }); return; }
+    }
+    setBusy(false); setTitle(''); setBody(''); setCategoryId(''); setFiles([]); setOpen(false); setNotice({ type: 'success', text: 'Mövzu yaradıldı.' }); await load();
   }
   async function markNotificationsRead() {
     if (!user || !notifications.length) return;
@@ -82,6 +97,8 @@ export default function ForumPage() {
       <label className="block"><span className="label">Başlıq</span><input className="input" required minLength={8} maxLength={160} value={title} onChange={(e) => setTitle(e.target.value)} /></label>
       <label className="block"><span className="label">Kateqoriya</span><select className="input" required value={categoryId} onChange={(e) => setCategoryId(e.target.value)}><option value="">Seçin</option>{categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></label>
       <label className="block"><span className="label">Mətn</span><textarea className="input min-h-32" required minLength={10} maxLength={12000} value={body} onChange={(e) => setBody(e.target.value)} /></label>
+      <label className="block"><span className="label">Şəkil və PDF əlavələri (istəyə görə, ən çox 4)</span><input className="input" type="file" accept="image/jpeg,image/png,image/webp,application/pdf" multiple onChange={(e) => setFiles(Array.from(e.target.files || []).slice(0, 4))} /><span className="hint">JPG, PNG, WEBP və PDF · hər fayl ən çox 5 MB</span></label>
+      {files.length > 0 && <p className="text-xs text-muted">Seçildi: {files.map((f) => f.name).join(', ')}</p>}
       <p className="text-xs text-muted">Maksimum 12 000 simvol. HTML və skript kimi deyil, adi mətn kimi göstərilir.</p>
       <button disabled={busy} className="btn btn-primary">{busy ? 'Yaradılır…' : 'Mövzunu dərc et'}</button>
     </form>}
