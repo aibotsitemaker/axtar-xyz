@@ -1,6 +1,6 @@
-# TEST_REPORT — TəhsilHub v6.4
+# TEST_REPORT — TəhsilHub v6.6
 
-Bu hesabat v6.3 tarixçəsini də saxlayır; bu ZIP üçün ən son yoxlama və dəyişikliklər aşağıdakı v6.4 bölməsindədir.
+Bu hesabat v6.3–v6.5 yoxlama tarixçəsini saxlayır; cari dizayn buraxılışı və son yoxlamalar v6.6 bölməsindədir.
 
 ## Supabase schema cache audit (v6.2 düzəlişi)
 
@@ -67,4 +67,27 @@ Bu hesabat v6.3 tarixçəsini də saxlayır; bu ZIP üçün ən son yoxlama və 
 - `npm run lint -- --quiet` uğurla keçdi. `npm run build -- --webpack` uğurla keçdi: compile, TypeScript və 34/34 static page prerender.
 - 06–08 faylları və mövcud məlumatlar dəyişdirilməyib; canlı Supabase bazasına miqrasiya tətbiq olunmayıb. Mövcud v6.3 bazasında deploy etməzdən əvvəl ehtiyat nüsxə alın və yalnız 13-cü SQL faylını icra edin.
 - Canlı Supabase, həqiqi istifadəçi hesabları ilə müəllim rol axını, brauzer cihazları, mail və storage bu mühitdən sınaqdan keçirilməyib. Full access build yoxlaması üçün müvəqqəti açılmışdı; iş bitəndən sonra istifadəçinin əvvəlki sandbox ayarını bərpa etməsi tövsiyə olunur.
+
+
+
+
+
+
+## v6.5 — yekun audit və yoxlamalar (2026-11-10)
+
+- Timeout sınağında aşkarlanmış kök səbəb: `start_quiz_session` vaxtı bitmiş sessiyanı köhnə single-choice scorer ilə yekunlaşdırırdı. 13-cü miqrasiya artıq `finish_quiz_session_v2`-yə yönləndirir.
+- PGlite timeout yoxlaması typed quiz-də 2+1+3 çəkili balın (6/6) saxlanmasını, sessiyanın `expired` olmasını və növbəti sessiyanın açılmasını təsdiqləyir.
+- `npm test --prefix tests/db`: 75 sxem və 42 layihə testi, 09–13 miqrasiya təkrar tətbiqi, PostgREST uyğunluğu, Feed/moderasiya, yeni sınaq növləri, timeout qiymətləndirməsi və avatar format yoxlamaları uğurla keçdi.
+- `npm ci --no-audit --no-fund` və `npm run lint -- --quiet` uğurla tamamlandı.
+- `npm run build -- --webpack` uğurla tamamlandı: webpack compile, TypeScript, 35/35 statik səhifə və build trace. Əvvəlki EPERM məhdud sandbox child-process davranışından yaranırdı; Full access mühitində standart build workaround-suz keçdi.
+- Brauzer smoke/E2E yoxlaması bu iş stansiyasında əlçatan olmadı: yerli browser istifadəsi bağlıdır və Chromium binary yoxdur. Buna görə brauzer testi uğurlu kimi göstərilmir.
+- Canlı Supabase-ə qoşulma və SQL icrası edilməyib; canlı RLS, Storage və e-poçt çatdırılması yoxlanmayıb. Mövcud v6.4 DB-si üçün backup-dan sonra yenilənmiş tam `13_quiz_question_types.sql` faylını bir dəfə tətbiq edin. 06–08 miqrasiyalarına toxunulmayıb.
+
+## v6.6 — dizayn yenilənməsi üzrə yoxlama
+- Ana marşrutda işlək sosial Feed göstərilir; mövcud Feed Supabase query/mutation-ları qorunub. Shell-də real marşrutlar, axtarış, dark-mode, hesab, mesaj/bildiriş counter-ları və müəllim tövsiyəsi var.
+- Responsive CSS breakpoint-ləri: <1024px mobil alt naviqasiya; 1024–1359px iki sütun; ≥1360px üç sütun. Bu breakpoint-lər kodda yoxlanıb; browser screenshot/real cihaz yoxlaması mümkün olmadı.
+- `npm run lint -- --quiet`, `npm test --prefix tests/db` (75 + 42 yoxlama və 09–13 migration ssenariləri) və `npm run build -- --webpack` uğurla tamamlandı; build 35/35 statik səhifə yaratdı.
+- Backend, auth, SQL miqrasiyaları, mövcud Supabase yazma əməliyyatları və biznes məntiqi dəyişdirilməyib. İctimai profildə son aktiv Feed paylaşımlarını göstərmək üçün yalnız oxu sorğusu əlavə olunub.
+
+Final dizayn kodundan sonra `npm run lint -- --quiet` və `npm run build -- --webpack` yenidən keçdi (35/35 statik səhifə). İctimai profilə real Feed paylaşımlarının oxunuşu və görünüşü də əlavə edildi; DB sxemi və yazma axınları dəyişmədi.
 

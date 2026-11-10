@@ -2,6 +2,6 @@
   "name": "tehsilhub-db-tests",
   "private": true,
   "type": "module",
-  "scripts": { "test": "node test.mjs && node test_newproject.mjs && node test_v6_migrations.mjs" },
+  "scripts": { "test": "node test.mjs && node test_newproject.mjs && node test_v6_migrations.mjs && node test_avatar.mjs" },
   "dependencies": { "@electric-sql/pglite": "^0.5.10" }
 }

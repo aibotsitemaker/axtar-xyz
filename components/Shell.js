@@ -8,23 +8,57 @@ import Icon from './Icons';
 import ThemeToggle from './ThemeToggle';
 
 const NAV = [
-  { href: '/', label: 'Ana səhifə', exact: true },
-  { href: '/forum', label: 'Forum' },
-  { href: '/feed', label: 'Feed' },
-  { href: '/search', label: 'Axtarış' },
-  { href: '/quizzes', label: 'Sınaqlar' },
-  { href: '/books', label: 'Kitab elanları' },
-  { href: '/pdfs', label: 'PDF arxivi' },
-  { href: '/chat', label: 'Çat' }
+  { href: '/', label: 'Ana səhifə', icon: 'home', exact: true },
+  { href: '/feed', label: 'TəhsilHub Feed', icon: 'feed' },
+  { href: '/quizzes', label: 'Sınaqlar', icon: 'quiz' },
+  { href: '/forum', label: 'Forum', icon: 'message' },
+  { href: '/search?q=müəllim', label: 'Müəllimlər', icon: 'teacher' },
+  { href: '/books', label: 'Kitab elanları', icon: 'book' },
+  { href: '/pdfs', label: 'PDF resurslar', icon: 'file' },
+  { href: '/chat', label: 'Mesajlar', icon: 'chat' },
+  { href: '/notifications', label: 'Bildirişlər', icon: 'bell' },
+  { href: '/profile?tab=saved', label: 'Yadda saxlananlar', icon: 'bookmark' },
+  { href: '/profile', label: 'Profilim', icon: 'user' }
 ];
+const MOBILE_NAV = NAV.filter((n) => ['/', '/feed', '/quizzes', '/forum', '/chat'].includes(n.href));
 
 function Logo() {
-  return (
-    <Link href="/" className="flex items-center gap-2.5 text-lg font-bold tracking-tight text-ink" aria-label="TəhsilHub — ana səhifə">
-      <span className="grid h-9 w-9 place-items-center rounded-lg bg-primary text-white"><Icon name="cap" className="h-5 w-5" /></span>
-      TəhsilHub
+  return <Link href="/" className="flex items-center gap-3 text-lg font-extrabold tracking-tight text-ink" aria-label="TəhsilHub — ana səhifə"><span className="brand-mark"><Icon name="cap" className="h-5 w-5" /></span><span>Təhsil<span className="text-primary">Hub</span></span></Link>;
+}
+
+function LeftRail({ active, user, me, unread, notif, logout }) {
+  const name = me.fullName || user?.user_metadata?.full_name || user?.email || 'İstifadəçi';
+  return <aside className="app-left-rail" aria-label="Əsas naviqasiya">
+    <div className="px-3 pb-5 pt-2"><Logo /></div>
+    <nav className="space-y-1" aria-label="Platforma">
+      {NAV.map((n) => <Link key={n.href} href={n.href} aria-current={active(n) ? 'page' : undefined} className={`rail-link ${active(n) ? 'rail-link-active' : ''}`}>
+        <span className="relative"><Icon name={n.icon} className="h-5 w-5" />{n.href === '/chat' && unread > 0 && <i className="nav-dot" />}{n.href === '/notifications' && notif > 0 && <i className="nav-dot" />}</span><span className="min-w-0 flex-1 truncate">{n.label}</span>{n.href === '/chat' && unread > 0 && <span className="rail-count">{unread > 9 ? '9+' : unread}</span>}{n.href === '/notifications' && notif > 0 && <span className="rail-count">{notif > 9 ? '9+' : notif}</span>}
+      </Link>)}
+    </nav>
+    <Link href={user ? '/feed' : '/auth?mode=register'} className="rail-join-card mt-6 block">
+      <span className="join-orbit"><Icon name="sparkle" className="h-5 w-5" /></span><strong>Öyrən, paylaş, inkişaf et</strong><span>İcmanın bir hissəsi ol və yeni imkanları kəşf et.</span><span className="join-action">{user ? 'Feed-ə keç' : 'İndi qoşul'} <Icon name="arrowRight" className="h-4 w-4" /></span>
     </Link>
-  );
+    {user && <div className="rail-account"><span className="avatar avatar-sm">{name.slice(0, 1).toUpperCase()}</span><span className="min-w-0 flex-1"><strong className="block truncate text-sm">{name}</strong><span className="block truncate text-xs text-muted">{user.email}</span></span><button type="button" title="Çıxış" aria-label="Hesabdan çıxış" onClick={logout} className="icon-button h-9 w-9 shrink-0"><Icon name="logout" className="h-4 w-4" /></button></div>}
+  </aside>;
+}
+
+function RightRail({ user }) {
+  const [teachers, setTeachers] = useState([]);
+  useEffect(() => {
+    let live = true;
+    supabase.from('profiles').select('id,full_name,username,avatar_url,is_verified').eq('account_type','teacher').order('is_verified',{ascending:false}).limit(3)
+      .then(({data}) => { if (live) setTeachers(data || []); });
+    return () => { live = false; };
+  }, []);
+  return <aside className="app-right-rail" aria-label="Kəşf et">
+    <div className="sticky top-24 space-y-5">
+      <section className="rail-panel"><div className="flex items-center justify-between"><h2 className="rail-heading">Bu gün öyrən</h2><span className="text-lg" aria-hidden="true">✨</span></div><p className="mt-2 text-sm leading-6 text-muted">Biliklərini möhkəmləndirmək üçün qısa sınaqla başla.</p><Link href="/quizzes" className="btn btn-primary mt-4 w-full">Sınaqlara bax <Icon name="arrowRight" className="h-4 w-4" /></Link></section>
+      <section className="rail-panel"><div className="mb-3 flex items-center justify-between"><h2 className="rail-heading">Təhsil mövzuları</h2><Icon name="trending" className="h-4 w-4 text-primary" /></div><div className="flex flex-wrap gap-2">{[['İmtahan hazırlığı','imtahan'],['Rəqəmsal təhsil','texnologiya'],['Karyera','karyera'],['Müəllimlik','müəllim']].map(([label,q])=><Link key={q} href={`/search?q=${encodeURIComponent(q)}`} className="topic-chip">#{label}</Link>)}</div><Link href="/search" className="mt-4 inline-flex items-center gap-1 text-sm font-semibold text-primary">Mövzuları kəşf et <Icon name="arrowRight" className="h-4 w-4" /></Link></section>
+      <section className="rail-panel"><div className="mb-3 flex items-center justify-between"><h2 className="rail-heading">Müəllimləri kəşf et</h2><Icon name="teacher" className="h-4 w-4 text-primary" /></div>{teachers.length ? <div className="space-y-3">{teachers.map((t)=><div key={t.id} className="flex items-center gap-2.5"><Link href={`/u/${t.id}`} className="avatar avatar-sm overflow-hidden">{t.avatar_url?<img src={t.avatar_url} alt="" className="h-full w-full object-cover"/>:(t.full_name||'M')[0]}</Link><Link href={`/u/${t.id}`} className="min-w-0 flex-1"><strong className="block truncate text-sm">{t.full_name||'Müəllim'}{t.is_verified&&<span className="verified-mark ml-1" title="Doğrulanmış hesab">✓</span>}</strong><span className="block truncate text-xs text-muted">{t.username?`@${t.username}`:'TəhsilHub müəllimi'}</span></Link><Link href={`/u/${t.id}`} aria-label={`${t.full_name||'Müəllim'} profilinə bax`} className="icon-button h-8 w-8"><Icon name="arrowRight" className="h-4 w-4" /></Link></div>)}</div> : <p className="text-sm leading-6 text-muted">Müəllim profillərini axtarış bölməsindən tapın.</p>}<Link href="/search?q=müəllim" className="mt-4 inline-flex items-center gap-1 text-sm font-semibold text-primary">Hamısına bax <Icon name="arrowRight" className="h-4 w-4" /></Link></section>
+      {!user && <section className="rail-join-card"><span className="join-orbit"><Icon name="users" className="h-5 w-5" /></span><strong>İcma ilə birlikdə böyü</strong><span>Profil yarat, suallar ver və faydalı resursları yadda saxla.</span><Link href="/auth?mode=register" className="join-action">Pulsuz qeydiyyat <Icon name="arrowRight" className="h-4 w-4" /></Link></section>}
+      <p className="px-2 text-xs leading-5 text-muted">Haqqımızda · Məxfilik · İstifadə şərtləri<br/>© {new Date().getFullYear()} TəhsilHub</p>
+    </div>
+  </aside>;
 }
 
 export default function Shell({ children }) {
@@ -35,174 +69,42 @@ export default function Shell({ children }) {
   const [drop, setDrop] = useState(false);
   const [unread, setUnread] = useState(0);
   const [notif, setNotif] = useState(0);
+  const [query, setQuery] = useState('');
   const dropRef = useRef(null);
-
+  const searchRef = useRef(null);
   const active = (n) => (n.exact ? path === n.href : path === n.href || path.startsWith(n.href + '/'));
-  const name = user?.user_metadata?.full_name || user?.email || '';
+  const name = me.fullName || user?.user_metadata?.full_name || user?.email || 'İstifadəçi';
 
   useEffect(() => { setMenu(false); setDrop(false); }, [path]);
-
+  useEffect(() => {
+    const onShortcut = (e) => { if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); searchRef.current?.focus(); } };
+    document.addEventListener('keydown', onShortcut);
+    return () => document.removeEventListener('keydown', onShortcut);
+  }, []);
   useEffect(() => {
     if (!drop) return undefined;
     const onDoc = (e) => { if (dropRef.current && !dropRef.current.contains(e.target)) setDrop(false); };
     const onKey = (e) => { if (e.key === 'Escape') setDrop(false); };
-    document.addEventListener('mousedown', onDoc);
-    document.addEventListener('keydown', onKey);
+    document.addEventListener('mousedown', onDoc); document.addEventListener('keydown', onKey);
     return () => { document.removeEventListener('mousedown', onDoc); document.removeEventListener('keydown', onKey); };
   }, [drop]);
-
   useEffect(() => {
-    if (!user) { setUnread(0); return undefined; }
+    if (!user) { setUnread(0); setNotif(0); return undefined; }
     let stop = false;
-    const load = () => supabase.rpc('unread_message_count').then(({ data, error }) => { if (!stop && !error) setUnread(Number(data) || 0); });
-    load();
-    const t = setInterval(load, 60000);
-    return () => { stop = true; clearInterval(t); };
-  }, [user, path]);
+    const load = async () => {
+      const [m,n] = await Promise.all([supabase.rpc('unread_message_count'),supabase.rpc('unread_notification_count')]);
+      if (!stop) { if (!m.error) setUnread(Number(m.data)||0); if (!n.error) setNotif(Number(n.data)||0); }
+    };
+    load(); const t=setInterval(load,60000); return()=>{stop=true;clearInterval(t);};
+  },[user,path]);
+  async function logout(){setDrop(false);setMenu(false);await supabase.auth.signOut();router.push('/');}
+  function search(e){e.preventDefault();const value=query.trim();if(value.length>=2)router.push(`/search?q=${encodeURIComponent(value)}`);else router.push('/search');}
 
-  // Forum bildirişlərinin sayı (RPC mövcud deyilsə — 06 tətbiq olunmayıbsa — səssiz keçilir)
-  useEffect(() => {
-    if (!user) { setNotif(0); return undefined; }
-    let stop = false;
-    const load = () => supabase.rpc('unread_notification_count').then(({ data, error }) => { if (!stop && !error) setNotif(Number(data) || 0); });
-    load();
-    const t = setInterval(load, 60000);
-    return () => { stop = true; clearInterval(t); };
-  }, [user, path]);
-
-  async function logout() {
-    setDrop(false); setMenu(false);
-    await supabase.auth.signOut();
-    router.push('/');
-  }
-
-  return (
-    <div className="flex min-h-screen flex-col">
-      <a href="#main" className="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-[60] focus:rounded-lg focus:bg-primary focus:px-4 focus:py-2 focus:text-white">
-        Əsas məzmuna keç
-      </a>
-
-      <header className="sticky top-0 z-40 border-b border-line bg-surface/90 backdrop-blur">
-        <div className="container-page flex h-16 items-center justify-between gap-4">
-          <Logo />
-
-          <nav className="hidden items-center gap-1 lg:flex" aria-label="Əsas menyu">
-            {NAV.map((n) => (
-              <Link key={n.href} href={n.href} aria-current={active(n) ? 'page' : undefined}
-                className={`relative rounded-lg px-3 py-2 text-sm font-medium transition-colors ${active(n) ? 'bg-primary-soft text-primary' : 'text-muted hover:bg-canvas hover:text-ink'}`}>
-                {n.label}
-                {n.href === '/chat' && unread > 0 && (
-                  <span className="absolute -right-0.5 -top-0.5 grid h-4 min-w-4 place-items-center rounded-full bg-primary px-1 text-[10px] font-bold text-white" aria-label={`${unread} oxunmamış mesaj`}>{unread > 9 ? '9+' : unread}</span>
-                )}
-              </Link>
-            ))}
-          </nav>
-
-          <div className="hidden items-center gap-2 lg:flex">
-            {!user ? (
-              <>
-                <Link href="/auth" className="btn btn-secondary btn-sm">Daxil ol</Link>
-                <Link href="/auth?mode=register" className="btn btn-primary btn-sm">Qeydiyyat</Link>
-              </>
-            ) : (
-              <div className="relative flex items-center gap-2" ref={dropRef}>
-                <Link href="/notifications" className="relative grid h-10 w-10 place-items-center rounded-lg border border-line bg-surface text-muted hover:bg-canvas hover:text-ink"
-                  aria-label={notif > 0 ? `Bildirişlər (${notif} oxunmamış)` : 'Bildirişlər'}>
-                  <Icon name="bell" className="h-5 w-5" />
-                  {notif > 0 && <span className="absolute -right-1 -top-1 grid h-4 min-w-4 place-items-center rounded-full bg-primary px-1 text-[10px] font-bold text-white" aria-hidden="true">{notif > 9 ? '9+' : notif}</span>}
-                </Link>
-                <button onClick={() => setDrop(!drop)} aria-haspopup="menu" aria-expanded={drop}
-                  className="flex h-10 items-center gap-2 rounded-lg border border-line bg-surface pl-1.5 pr-2.5 hover:bg-canvas">
-                  <span className="grid h-7 w-7 place-items-center rounded-md bg-primary text-xs font-bold text-white">{name[0]?.toUpperCase() || 'U'}</span>
-                  <Icon name="chevronDown" className="h-4 w-4 text-muted" />
-                </button>
-                {drop && (
-                  <div role="menu" className="card absolute right-0 top-full z-50 mt-2 w-60 p-1.5 shadow-pop">
-                    <div className="border-b border-line px-3 py-2">
-                      <p className="truncate text-sm font-semibold">{user.user_metadata?.full_name || 'İstifadəçi'}</p>
-                      <p className="truncate text-xs text-muted">{user.email}</p>
-                    </div>
-                    {me.isAdmin && <Link role="menuitem" href="/admin" className="mt-1 flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-primary hover:bg-primary-soft"><Icon name="shield" className="h-4 w-4" />Admin paneli</Link>}
-                    {(me.accountType === 'teacher' || me.isAdmin) && <Link role="menuitem" href="/teacher/quizzes" className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm hover:bg-canvas"><Icon name="quiz" className="h-4 w-4 text-muted" />Sınaqlarımı idarə et</Link>}
-                    <Link role="menuitem" href="/profile" className="mt-1 flex items-center gap-2 rounded-lg px-3 py-2 text-sm hover:bg-canvas"><Icon name="user" className="h-4 w-4 text-muted" />Kabinet</Link>
-                    <Link role="menuitem" href="/notifications" className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm hover:bg-canvas"><Icon name="bell" className="h-4 w-4 text-muted" />Bildirişlər{notif > 0 ? ` (${notif})` : ''}</Link>
-                    <Link role="menuitem" href="/chat" className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm hover:bg-canvas"><Icon name="chat" className="h-4 w-4 text-muted" />Mesajlar{unread > 0 ? ` (${unread})` : ''}</Link>
-                    <button role="menuitem" onClick={logout} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-danger hover:bg-danger-soft"><Icon name="logout" className="h-4 w-4" />Çıxış</button>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-
-          <div className="flex items-center gap-2">
-            <ThemeToggle />
-            <button className="grid h-10 w-10 place-items-center rounded-lg border border-line text-ink lg:hidden"
-              aria-label={menu ? 'Menyunu bağla' : 'Menyunu aç'} aria-expanded={menu} aria-controls="mobile-menu"
-              onClick={() => setMenu(!menu)}>
-              <Icon name={menu ? 'x' : 'menu'} />
-            </button>
-          </div>
-        </div>
-
-        {menu && (
-          <div id="mobile-menu" className="border-t border-line bg-surface lg:hidden">
-            <nav className="container-page flex flex-col gap-1 py-3" aria-label="Mobil menyu">
-              {NAV.map((n) => (
-                <Link key={n.href} href={n.href} aria-current={active(n) ? 'page' : undefined}
-                  className={`flex min-h-11 items-center justify-between rounded-lg px-3 text-base font-medium ${active(n) ? 'bg-primary-soft text-primary' : 'text-ink hover:bg-canvas'}`}>
-                  {n.label}
-                  {n.href === '/chat' && unread > 0 && <span className="rounded-full bg-primary px-2 py-0.5 text-xs font-bold text-white">{unread}</span>}
-                </Link>
-              ))}
-              <div className="mt-2 grid gap-2 border-t border-line pt-3">
-                {!user ? (
-                  <div className="grid grid-cols-2 gap-2">
-                    <Link href="/auth" className="btn btn-secondary">Daxil ol</Link>
-                    <Link href="/auth?mode=register" className="btn btn-primary">Qeydiyyat</Link>
-                  </div>
-                ) : (
-                  <>
-                    {me.isAdmin && <Link href="/admin" className="btn btn-primary"><Icon name="shield" className="h-4 w-4" />Admin paneli</Link>}
-                    {(me.accountType === 'teacher' || me.isAdmin) && <Link href="/teacher/quizzes" className="btn btn-secondary"><Icon name="quiz" className="h-4 w-4" />Sınaqlarımı idarə et</Link>}
-                    <Link href="/notifications" className="btn btn-secondary"><Icon name="bell" className="h-4 w-4" />Bildirişlər{notif > 0 ? ` (${notif})` : ''}</Link>
-                    <Link href="/profile" className="btn btn-secondary"><Icon name="user" className="h-4 w-4" />Kabinet</Link>
-                    <button onClick={logout} className="btn btn-danger"><Icon name="logout" className="h-4 w-4" />Çıxış</button>
-                  </>
-                )}
-              </div>
-            </nav>
-          </div>
-        )}
-      </header>
-
-      <main id="main" className="container-page flex-1 py-6 sm:py-8">{children}</main>
-
-      <footer className="border-t border-line bg-surface">
-        <div className="container-page grid gap-8 py-10 sm:grid-cols-2 lg:grid-cols-4">
-          <div className="lg:col-span-2">
-            <Logo />
-            <p className="mt-3 max-w-sm text-sm text-muted">Forum, sınaqlar, ikinci əl kitablar, PDF resurslar və tələbələr arasında canlı ünsiyyət — hamısı bir platformada.</p>
-          </div>
-          <div>
-            <h2 className="text-sm font-semibold">Platforma</h2>
-            <ul className="mt-3 space-y-2 text-sm text-muted">
-              <li><Link href="/forum" className="hover:text-primary">Forum</Link></li>
-              <li><Link href="/quizzes" className="hover:text-primary">Sınaqlar</Link></li>
-              <li><Link href="/books" className="hover:text-primary">Kitab elanları</Link></li>
-              <li><Link href="/pdfs" className="hover:text-primary">PDF arxivi</Link></li>
-              <li><Link href="/chat" className="hover:text-primary">Çat</Link></li>
-            </ul>
-          </div>
-          <div>
-            <h2 className="text-sm font-semibold">Hüquqi</h2>
-            <ul className="mt-3 space-y-2 text-sm text-muted">
-              <li><Link href="/legal/privacy" className="hover:text-primary">Məxfilik Siyasəti</Link></li>
-              <li><Link href="/legal/terms" className="hover:text-primary">İstifadə Şərtləri</Link></li>
-            </ul>
-          </div>
-        </div>
-        <div className="border-t border-line py-4 text-center text-xs text-muted">© {new Date().getFullYear()} TəhsilHub. Bütün hüquqlar qorunur.</div>
-      </footer>
-    </div>
-  );
+  return <div className="app-shell min-h-screen">
+    <a href="#main" className="skip-link">Əsas məzmuna keç</a>
+    <header className="app-topbar"><div className="app-topbar-inner"><div className="lg:hidden"><Logo/></div><form onSubmit={search} role="search" className="top-search"><Icon name="search" className="h-5 w-5 shrink-0 text-muted"/><input ref={searchRef} aria-label="Platformada axtar" value={query} onChange={(e)=>setQuery(e.target.value.slice(0,100))} placeholder="Müəllim, mövzu və resurs axtar..."/><kbd className="hidden sm:inline-flex">Ctrl K</kbd></form><div className="flex items-center gap-2"><ThemeToggle/>{user&&<Link href="/notifications" aria-label={notif?`Bildirişlər, ${notif} oxunmamış`:'Bildirişlər'} className="icon-button relative"><Icon name="bell" className="h-5 w-5"/>{notif>0&&<span className="notification-badge">{notif>9?'9+':notif}</span>}</Link>}{!user?<><Link href="/auth" className="btn btn-ghost btn-sm hidden sm:inline-flex">Daxil ol</Link><Link href="/auth?mode=register" className="btn btn-primary btn-sm">Qoşul</Link></>:<div className="relative" ref={dropRef}><button type="button" onClick={()=>setDrop(!drop)} aria-haspopup="menu" aria-expanded={drop} className="profile-trigger"><span className="avatar avatar-sm">{name[0]?.toUpperCase()||'İ'}</span><span className="hidden max-w-28 truncate text-sm font-semibold md:inline">{name}</span><Icon name="chevronDown" className="h-4 w-4 text-muted"/></button>{drop&&<div role="menu" className="profile-menu"><div className="mb-1 border-b border-line px-3 pb-3 pt-2"><strong className="block truncate text-sm">{name}</strong><span className="text-xs text-muted">{user.email}</span></div>{me.isAdmin&&<Link role="menuitem" href="/admin" className="menu-link"><Icon name="shield" className="h-4 w-4"/>Admin paneli</Link>}{(me.accountType==='teacher'||me.isAdmin)&&<Link role="menuitem" href="/teacher/quizzes" className="menu-link"><Icon name="quiz" className="h-4 w-4"/>Sınaqlarımı idarə et</Link>}<Link role="menuitem" href="/profile" className="menu-link"><Icon name="user" className="h-4 w-4"/>Profilim</Link><button role="menuitem" onClick={logout} className="menu-link w-full text-danger"><Icon name="logout" className="h-4 w-4"/>Çıxış</button></div>}</div>}<button type="button" className="icon-button lg:hidden" aria-label="Naviqasiyanı aç" aria-expanded={menu} onClick={()=>setMenu(!menu)}><Icon name={menu?'x':'menu'} className="h-5 w-5"/></button></div></div></header>
+    {menu&&<div className="mobile-drawer lg:hidden"><nav className="space-y-1">{NAV.map(n=><Link key={n.href} href={n.href} className={`rail-link ${active(n)?'rail-link-active':''}`}><Icon name={n.icon} className="h-5 w-5"/>{n.label}</Link>)}</nav>{user&&<div className="mt-3 border-t border-line pt-3"><Link href="/profile" className="menu-link">Profilim</Link><button onClick={logout} className="menu-link w-full text-danger">Çıxış</button></div>}</div>}
+    <div className="app-layout"><LeftRail active={active} user={user} me={me} unread={unread} notif={notif} logout={logout}/><main id="main" className="app-main">{children}</main><RightRail user={user}/></div>
+    <nav className="mobile-tabbar lg:hidden" aria-label="Mobil əsas menyu">{MOBILE_NAV.map(n=><Link key={n.href} href={n.href} aria-current={active(n)?'page':undefined} className={`mobile-tab ${active(n)?'mobile-tab-active':''}`}><span className="relative"><Icon name={n.icon} className="h-5 w-5"/>{n.href==='/chat'&&unread>0&&<i className="nav-dot"/>}</span><span>{n.label==='Ana səhifə'?'Ana səh.':n.label==='Sınaqlar'?'Sınaq':n.label==='TəhsilHub Feed'?'Feed':n.label==='Mesajlar'?'Mesaj':'Forum'}</span></Link>)}</nav>
+  </div>;
 }

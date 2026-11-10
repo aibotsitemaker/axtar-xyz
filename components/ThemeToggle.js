@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Icon from './Icons';
 
 const KEY = 'tehsilhub-theme';
 
@@ -21,5 +22,5 @@ export default function ThemeToggle() {
     try { localStorage.setItem(KEY, next ? 'dark' : 'light'); } catch { /* Rejim bu səhifədə tətbiq olunur. */ }
   }
 
-  return <button type="button" onClick={toggle} className="grid h-10 min-w-10 place-items-center rounded-lg border border-line bg-surface px-2 text-sm text-ink hover:bg-canvas" aria-label={dark ? 'Açıq rejimə keç' : 'Qaranlıq rejimə keç'} title={dark ? 'Açıq rejim' : 'Qaranlıq rejim'}>{dark ? '☀️' : '🌙'}</button>;
+  return <button type="button" onClick={toggle} className="icon-button" aria-label={dark ? 'Açıq rejimə keç' : 'Qaranlıq rejimə keç'} title={dark ? 'Açıq rejim' : 'Qaranlıq rejim'}><Icon name={dark ? 'sun' : 'moon'} className="h-5 w-5" /></button>;
 }

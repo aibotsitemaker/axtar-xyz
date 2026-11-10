@@ -53,8 +53,24 @@ const rpc=await db.query("select to_regprocedure('public.submit_quiz_attempt_onc
 if(!rpc.rows[0].f||!rpc.rows[0].v)throw new Error('V6 RPC-lər yaradılmadı');
 const searchArgs=await db.query("select proargnames from pg_proc where oid='public.global_search(text,text)'::regprocedure");
 if(searchArgs.rows[0]?.proargnames?.slice(0,2).join(',')!=='p_query,p_kind')throw new Error('global_search PostgREST parametr adları uyğun deyil');
-await db.exec("insert into public.profiles(id,full_name,username,account_type) values('a0000000-0000-0000-0000-00000000000a','Müəllim','teacher1','teacher'),('b0000000-0000-0000-0000-00000000000b','Şagird','student1','student'); insert into public.quizzes(id,duration_seconds,is_published) values('c0000000-0000-0000-0000-00000000000c',600,true); insert into public.quiz_questions(id,quiz_id,position,question_text,options,correct_index,explanation) values('d0000000-0000-0000-0000-00000000000d','c0000000-0000-0000-0000-00000000000c',1,'Sual','[\"x\",\"y\"]',1,'İzah');");
+await db.exec("insert into public.profiles(id,full_name,username,account_type) values('a0000000-0000-0000-0000-00000000000a','Müəllim','teacher1','teacher'),('b0000000-0000-0000-0000-00000000000b','Şagird','student1','student'),('f0000000-0000-0000-0000-00000000000f','İstifadəçi','user3','student'); insert into public.quizzes(id,duration_seconds,is_published) values('c0000000-0000-0000-0000-00000000000c',600,true); insert into public.quiz_questions(id,quiz_id,position,question_text,options,correct_index,explanation) values('d0000000-0000-0000-0000-00000000000d','c0000000-0000-0000-0000-00000000000c',1,'Sual','[\"x\",\"y\"]',1,'İzah');");
+await db.exec("set role authenticated; select set_config('request.jwt.claim.sub','f0000000-0000-0000-0000-00000000000f',false); select set_config('request.jwt.claim.role','authenticated',false)");
+for(let i=0;i<10;i++)if(!(await db.query('select public.claim_avatar_upload() as ok')).rows[0].ok)throw new Error('Avatar limiti 10 yükləməyə icazə vermədi');
+if((await db.query('select public.claim_avatar_upload() as ok')).rows[0].ok)throw new Error('Avatar upload limiti 11-ci faylı bloklamadı');
+await db.exec('reset role');
 await db.exec("set role authenticated; select set_config('request.jwt.claim.sub','b0000000-0000-0000-0000-00000000000b',false); select set_config('request.jwt.claim.role','authenticated',false);");
+await db.query("insert into public.teacher_reviews(teacher_id,author_id,rating,body) values('a0000000-0000-0000-0000-00000000000a','b0000000-0000-0000-0000-00000000000b',5,'Çox yaxşı müəllimdir')");
+await db.exec("select set_config('request.jwt.claim.sub','f0000000-0000-0000-0000-00000000000f',false)");
+const teacherReview=(await db.query("select id from public.teacher_reviews where teacher_id='a0000000-0000-0000-0000-00000000000a'")).rows[0];
+await db.query("insert into public.teacher_review_reports(review_id,reporter_id,reason,details) values($1,'f0000000-0000-0000-0000-00000000000f','false_info','Yoxlama qeydi')",[teacherReview.id]);
+await db.exec("select set_config('test.admin','true',false)");
+const sent=(await db.query("select public.admin_send_announcement('Vacib elan','Sistemdə yenilik var','/feed') as n")).rows[0].n;
+if(sent!==2)throw new Error('Admin ümumi bildirişi istifadəçilərə çatmadı');
+const reviewReport=(await db.query("select id from public.teacher_review_reports")).rows[0];
+await db.query("select public.admin_resolve_teacher_review_report($1,'resolved','Məzmun yoxlanıldı',true)",[reviewReport.id]);
+if((await db.query("select status from public.teacher_reviews where id=$1",[teacherReview.id])).rows[0].status!=='hidden')throw new Error('Admin rəy şikayətini həll edib rəyi gizlədə bilmədi');
+await db.exec("select set_config('test.admin','false',false); select set_config('request.jwt.claim.sub','b0000000-0000-0000-0000-00000000000b',false)");
+
 const run=(await db.query("select * from public.start_quiz_session('c0000000-0000-0000-0000-00000000000c')")).rows[0];
 await db.query("select public.save_quiz_session_answer($1,'d0000000-0000-0000-0000-00000000000d',1)",[run.session_id]);
 const resumed=(await db.query("select * from public.start_quiz_session('c0000000-0000-0000-0000-00000000000c')")).rows[0];
@@ -84,8 +100,14 @@ const typedResult=(await db.query('select * from public.finish_quiz_session_v2($
 if(typedResult.r_correct!==3||Number(typedResult.r_earned_points)!==6||Number(typedResult.r_percent)!==100)throw new Error('Yeni sual növlərinin server qiymətləndirilməsi/bal hesabı yanlışdır');
 const typedReview=await db.query('select * from public.quiz_session_review_v2($1)',[typedRun.session_id]);
 if(typedReview.rows.length!==3||typedReview.rows.some(x=>!x.is_correct))throw new Error('Yeni sual növləri üzrə təhlil səhvdir');
-await db.query('select public.teacher_publish_quiz($1,true)',[typedQuiz]);
-// SECURITY DEFINER publish RPC succeeded without granting direct table writes.
+const expiring=(await db.query('select * from public.start_quiz_session($1)',[typedQuiz])).rows[0];
+for(const [i,a] of [[0,[0,2]],[1,'Bakı'],[2,42]]) await db.query('select public.save_quiz_session_answer_v2($1,$2,$3::jsonb)',[expiring.session_id,tq.rows[i].id,JSON.stringify(a)]);
+await db.exec(`reset role; update public.quiz_sessions set ends_at=now()-interval '1 second' where id='${expiring.session_id}'; set role authenticated;`);
+const resumedAfterExpiry=(await db.query('select * from public.start_quiz_session($1)',[typedQuiz])).rows[0];
+await db.exec('reset role');
+const weightedExpired=(await db.query('select s.status,a.earned_points,a.max_points from public.quiz_sessions s join public.quiz_attempts a on a.id=s.attempt_id where s.id=$1',[expiring.session_id])).rows[0];
+if(!resumedAfterExpiry.session_id||weightedExpired.status!=='expired'||Number(weightedExpired.earned_points)!==6||Number(weightedExpired.max_points)!==6)throw new Error('Vaxtı bitmiş yeni tipli sınaq legacy qaydada və ya səhv balla bağlandı');
+await db.exec("set role authenticated; select set_config('request.jwt.claim.sub','b0000000-0000-0000-0000-00000000000b',false); select set_config('request.jwt.claim.role','authenticated',false);");
 await db.exec("select set_config('request.jwt.claim.sub','b0000000-0000-0000-0000-00000000000b',false)");
 
 await db.exec("reset role; set role anon; select set_config('request.jwt.claim.role','anon',false);");
@@ -113,6 +135,7 @@ await db.exec('reset role');
 const mention=await db.query("select count(*)::int as n from public.notifications where user_id='a0000000-0000-0000-0000-00000000000a' and type='feed_mention'");
 if(mention.rows[0].n!==1)throw new Error('Feed mention bildirişi yaranmadı');
 await db.exec("set role authenticated; select set_config('request.jwt.claim.sub','b0000000-0000-0000-0000-00000000000b',false); select set_config('request.jwt.claim.role','authenticated',false);");
+
 await db.query("insert into public.feed_reports(reporter_id,post_id,reason,details) values('b0000000-0000-0000-0000-00000000000b','e0000000-0000-0000-0000-00000000000e','spam','Yoxlama')");
 const report=(await db.query("select id from public.feed_reports where post_id='e0000000-0000-0000-0000-00000000000e'")).rows[0];
 await db.exec("select set_config('test.admin','true',false)");
@@ -133,5 +156,5 @@ console.log('PASS  correct answers are hidden, legacy answer RPC is revoked, gue
 console.log('PASS  admin analytics date filters and global search run on the database');
 console.log('PASS  PostgREST compatibility migration repairs reordered RPC argument names and re-runs safely');
 console.log('PASS  quiz review reveals answers only after submit; expired sessions are finalized; profile stats, mention notifications and Feed report moderation work');
-console.log('PASS  quiz question types, weighted scoring, review and teacher create/publish RPCs work');
+console.log('PASS  quiz question types/points, teacher authoring, review-report moderation and admin broadcast work');
 await db.close();

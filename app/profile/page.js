@@ -48,7 +48,7 @@ export default function ProfilePage() {
       supabase.from('books').select('*').eq('seller_id', user.id).order('created_at', { ascending: false }),
       supabase.from('favorites').select('*, books(*), pdfs(*)').eq('user_id', user.id).order('created_at', { ascending: false }),
       supabase.from('pdfs').select('*').eq('uploader_id', user.id).order('created_at', { ascending: false }),
-      supabase.from('quiz_attempts').select('id, correct_count, total_questions, score_percent, seconds_used, created_at, quizzes(title)').eq('user_id', user.id).order('created_at', { ascending: false }).limit(50),
+      supabase.from('quiz_attempts').select('id, correct_count, total_questions, score_percent, earned_points, max_points, seconds_used, created_at, quizzes(title)').eq('user_id', user.id).order('created_at', { ascending: false }).limit(50),
       supabase.from('saved_content').select('content_type,content_id,created_at').eq('user_id', user.id).order('created_at',{ascending:false}),
       supabase.from('verification_requests').select('id,status,admin_note,created_at').eq('user_id',user.id).order('created_at',{ascending:false}).limit(1).maybeSingle()
     ]);
@@ -62,6 +62,10 @@ export default function ProfilePage() {
   }, [user]);
 
   useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    const selected = new URLSearchParams(window.location.search).get('tab');
+    if (['books','pdfs','favs','saved','results','settings'].includes(selected)) setTab(selected);
+  }, []);
 
   async function save(e) {
     e.preventDefault();
@@ -117,15 +121,15 @@ export default function ProfilePage() {
     }
     setAvatarBusy(true);
     setAvatarMsg({ type: '', text: '' });
-    const path = `${user.id}/${crypto.randomUUID()}.${allowed[file.type]}`;
+    const { data: sessionData } = await supabase.auth.getSession();
+    if (!sessionData.session?.access_token) { setAvatarMsg({ type: 'error', text: 'Şəkil yükləmək üçün yenidən daxil olun.' }); return; }
+    const uploadForm = new FormData(); uploadForm.append('file', file);
+    const uploadResponse = await fetch('/api/avatar', { method: 'POST', headers: { Authorization: `Bearer ${sessionData.session.access_token}` }, body: uploadForm });
+    const uploadData = await uploadResponse.json().catch(() => ({}));
+    if (!uploadResponse.ok) { setAvatarBusy(false); setAvatarMsg({ type: 'error', text: uploadData.error || 'Şəkli yükləmək mümkün olmadı.' }); return; }
+    const path = uploadData.path;
+    const url = uploadData.publicUrl;
     const storage = supabase.storage.from('avatars');
-    const { error: uploadError } = await storage.upload(path, file, { contentType: file.type, cacheControl: '3600', upsert: false });
-    if (uploadError) {
-      setAvatarBusy(false);
-      setAvatarMsg({ type: 'error', text: errText(uploadError, 'Şəkli yükləmək mümkün olmadı.') });
-      return;
-    }
-    const url = storage.getPublicUrl(path).data.publicUrl;
     const previousPath = (() => {
       const marker = '/storage/v1/object/public/avatars/';
       const oldUrl = profile?.avatar_url || '';
@@ -205,7 +209,7 @@ export default function ProfilePage() {
 
   return (
     <div>
-      <div className="card mb-6 flex flex-wrap items-center justify-between gap-4 p-5">
+      <div className="profile-hero card mb-6 flex flex-wrap items-center justify-between gap-4 p-5 sm:p-6">
         <div className="flex min-w-0 items-center gap-4">
           <div className="grid h-14 w-14 shrink-0 place-items-center overflow-hidden rounded-full bg-primary text-xl font-bold text-white">{profile?.avatar_url ? <img src={profile.avatar_url} alt="Profil şəkli" className="h-full w-full object-cover" /> : name[0].toUpperCase()}</div>
           <div className="min-w-0">
@@ -301,7 +305,7 @@ export default function ProfilePage() {
             <div key={a.id} className="card flex flex-wrap items-center justify-between gap-3 p-4">
               <div className="min-w-0">
                 <p className="truncate font-semibold">{a.quizzes?.title || 'Sınaq'}</p>
-                <p className="mt-0.5 text-xs text-muted">{fmtDate(a.created_at)} · {a.correct_count}/{a.total_questions} düzgün · {fmtSec(a.seconds_used)}</p>
+                <p className="mt-0.5 text-xs text-muted">{fmtDate(a.created_at)} · {a.correct_count}/{a.total_questions} düzgün · {Number(a.earned_points||0).toFixed(2)}/{Number(a.max_points||a.total_questions||0).toFixed(2)} bal · {fmtSec(a.seconds_used)}</p>
               </div>
               <span className={`rounded-full px-3 py-1 text-sm font-bold ${Number(a.score_percent) >= 70 ? 'bg-success-soft text-success' : Number(a.score_percent) >= 40 ? 'bg-primary-soft text-primary' : 'bg-danger-soft text-danger'}`}>{Math.round(Number(a.score_percent))}%</span>
             </div>

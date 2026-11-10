@@ -32,3 +32,16 @@
 - Server cavabları təhlükəsiz JSON RPC ilə saxlayır, tolerantlıqlı mətn/rəqəm müqayisəsi aparır, balları hesablayır; cavab açarları REST-dən bağlı qalır.
 - Müəllim sınaq yarada, qaralama kimi saxlaya, dərc və dərcdən çıxara bilir; RLS və RPC sahiblik yoxlaması əlavə edildi.
 - Yeni additive `13_quiz_question_types.sql`; köhnə sessiya/RPC interfeysləri və mövcud sınaq cəhdləri saxlanıldı.
+
+## v6.5
+- Vaxtı bitmiş typed quiz sessiyaları yeni çəkili bal qiymətləndiricisi ilə avtomatik yekunlaşır.
+- Testlər timeout zamanı çoxseçimli, mətn və rəqəm suallarının düzgün balını təsdiqləyir.
+- İstehsal build və statik təhlil hesabatı son mənbə koduna uyğun yeniləndi.
+
+## v6.6 — sosial məhsul dizaynı
+- Əsas səhifə işlək TəhsilHub Feed axınına çevrildi; mövcud post, bəyənmə, şərh, yadda saxlama və şikayət əməliyyatları saxlanıldı.
+- Tətbiq shell-i yeniləndi: axtarış üst paneli, bütün mövcud bölmələr üçün sol naviqasiya, hesab menyusu, mesaj/bildiriş nişanları və geniş ekranda müəllim kəşf paneli.
+- 1360px+ ekranda 3 sütun, tablet ölçüdə yan naviqasiya ilə 2 sütun, kiçik ekranda alt menyu tətbiq olunur.
+- Indigo design tokens, premium kartlar, empty/skeleton/focus/hover vəziyyətləri, dark mode kontrastları və sosial profil banneri əlavə edildi.
+- SEO başlıq/təsvir sosial təhsil icmasına uyğunlaşdırıldı; backend, Supabase, SQL, auth və biznes əməliyyatlarına toxunulmadı.
+

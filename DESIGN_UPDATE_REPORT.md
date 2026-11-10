@@ -46,3 +46,11 @@ Sınaq nəticələri tarixçəsi (mövcud `quiz_attempts` oxunur), oxunmamış m
 **Yeni:** `components/ui.js`, `components/Icons.js`, `components/HomeLive.js`, `eslint.config.mjs`, `DESIGN_UPDATE_REPORT.md`, `TEST_REPORT.md`, `screenshots/*`, `tests/browser/*`.
 **Dəyişdirilib:** `app/globals.css`, `tailwind.config.js`, `app/layout.js`, `app/page.js`, `app/icon.js`, `app/not-found.js`, `app/error.js`, `app/auth/page.js`, `app/auth/reset/page.js`, `app/books/page.js`, `app/pdfs/page.js`, `app/quizzes/page.js`, `app/chat/page.js`, `app/profile/page.js`, `components/Shell.js`, `components/AdSlot.js`, `components/AuthProvider.js`, `components/LegalView.js`, `package.json`, `package-lock.json`, `README.md`, `DEPLOY.md`.
 **Toxunulmayıb:** `lib/*`, `next.config.js`, bütün SQL faylları, `app/robots.js`, `app/sitemap.js`, `app/ads.txt/route.js`, route layout-ları (SEO metadata).
+
+## v6.6 — sosial platforma görünüşü (2026-11-10)
+
+Yeni görünüş vahid üç sütunlu tətbiq çərçivəsi ilə quruldu. Ana səhifə mövcud real Feed ekranını göstərir; `app/feed/page.js`-dəki Supabase sorğuları, bəyənmə, şərh/cavab, redaktə/silmə, paylaşım linki, yadda saxlama və şikayət əməliyyatları saxlanılıb. Sol naviqasiya bütün real marşrutları əhatə edir; müəllim paneli və admin keçidləri, oxunmamış mesaj/bildiriş sayları və hesab çıxışı qorunur. Sağ panel real teacher profil sorğusundan tövsiyə verir, mövzu keçidləri mövcud axtarış RPC-sindən istifadə edir.
+
+Desktop 1360px-dən etibarən 3 sütun, 1024–1359px aralığında 2 sütun, 1023px və aşağıda mobil alt menyu tətbiq olunur. Mövcud funksiyaları təsdiqləyən DB suite ilə yanaşı lint və production build yenidən işlədilib. Yerli browser istifadəsi bağlı olduğundan vizual browser/screenshot və real cihaz yoxlaması aparılmayıb.
+
+İctimai müəllim/istifadəçi profilində cover üslublu başlıq və statistik kartlarla yanaşı, mövcud profil rəyləri saxlanıldı və profil sahibinin real, aktiv Feed paylaşımları göstərildi.

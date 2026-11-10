@@ -4,18 +4,18 @@ import { AuthProvider } from '../components/AuthProvider';
 import Shell from '../components/Shell';
 import { SITE_URL, SITE_NAME, ADSENSE_CLIENT } from '../lib/site';
 
-const DESCRIPTION = 'İkinci əl kitab bazarı, PDF arxivi, onlayn sınaqlar və tələbələr üçün canlı çat platforması.';
+const DESCRIPTION = 'Müəllim və tələbələri birləşdirən təhsil icması: sosial Feed, müzakirələr, sınaqlar və faydalı resurslar.';
 
 export const metadata = {
   metadataBase: new URL(SITE_URL),
-  title: { default: `${SITE_NAME} — Kitab, PDF, Sınaq və Canlı Çat`, template: `%s | ${SITE_NAME}` },
+  title: { default: `${SITE_NAME} — Təhsil icması, müəllimlər və sınaqlar`, template: `%s | ${SITE_NAME}` },
   description: DESCRIPTION,
   alternates: { canonical: '/' },
-  openGraph: { type: 'website', locale: 'az_AZ', siteName: SITE_NAME, title: `${SITE_NAME} — Kitab, PDF, Sınaq və Canlı Çat`, description: DESCRIPTION, url: SITE_URL },
+  openGraph: { type: 'website', locale: 'az_AZ', siteName: SITE_NAME, title: `${SITE_NAME} — Təhsil icması, müəllimlər və sınaqlar`, description: DESCRIPTION, url: SITE_URL },
   twitter: { card: 'summary', title: SITE_NAME, description: DESCRIPTION },
   ...(ADSENSE_CLIENT ? { other: { 'google-adsense-account': ADSENSE_CLIENT } } : {})
 };
-export const viewport = { width: 'device-width', initialScale: 1, themeColor: '#2563EB' };
+export const viewport = { width: 'device-width', initialScale: 1, themeColor: '#4F46E5' };
 
 const jsonLd = { '@context': 'https://schema.org', '@type': 'WebSite', name: SITE_NAME, url: SITE_URL, inLanguage: 'az' };
 

@@ -24,6 +24,9 @@ export default function AdminDashboard() {
   const [period, setPeriod] = useState(7);
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(true);
+  const [noticeForm,setNoticeForm]=useState({title:'',body:'',link:''});const [noticeBusy,setNoticeBusy]=useState(false);const [noticeMsg,setNoticeMsg]=useState('');
+
+  async function sendAnnouncement(e){e.preventDefault();setNoticeBusy(true);setNoticeMsg('');const {data,error}=await supabase.rpc('admin_send_announcement',{p_title:noticeForm.title.trim(),p_body:noticeForm.body.trim(),p_link:noticeForm.link.trim()||null});setNoticeBusy(false);if(error)setNoticeMsg(error.message);else{setNoticeMsg(`${data} istifadəçiyə bildiriş göndərildi.`);setNoticeForm({title:'',body:'',link:''});}}
 
   const load = useCallback(async () => {
     setBusy(true);
@@ -103,6 +106,15 @@ export default function AdminDashboard() {
                   ))}
                 </ul>
               )}
+            </Section>
+
+            <Section title="Vacib bildiriş göndər" id="d-announcement">
+              <form onSubmit={sendAnnouncement} className="card space-y-3 p-4">
+                <label className="label" htmlFor="announcement-title">Başlıq<input id="announcement-title" className="input" maxLength={120} minLength={3} required value={noticeForm.title} onChange={e=>setNoticeForm(v=>({...v,title:e.target.value}))}/></label>
+                <label className="label" htmlFor="announcement-body">Mətn<textarea id="announcement-body" className="input" rows={3} maxLength={2000} required value={noticeForm.body} onChange={e=>setNoticeForm(v=>({...v,body:e.target.value}))}/></label>
+                <label className="label" htmlFor="announcement-link">Daxili keçid (könüllü)<input id="announcement-link" className="input" maxLength={300} placeholder="/feed" value={noticeForm.link} onChange={e=>setNoticeForm(v=>({...v,link:e.target.value}))}/></label>
+                {noticeMsg&&<p role="status" className="text-sm text-muted">{noticeMsg}</p>}<button className="btn btn-primary" disabled={noticeBusy}>{noticeBusy&&<Spinner/>}Bütün istifadəçilərə göndər</button>
+              </form>
             </Section>
 
             <Section title="Son admin fəaliyyətləri" id="d-activity">

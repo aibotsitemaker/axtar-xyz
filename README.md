@@ -1,6 +1,6 @@
 # TəhsilHub
 
-Platforma buraxılışı: **v6.4**. Bu versiyada sınaqlar üçün əlavə sual formatları və müəllim sınaqlarının idarəetmə səhifəsi var. Mövcud Supabase bazasını yeniləmək üçün [DATABASE_MIGRATIONS.md](DATABASE_MIGRATIONS.md) üzrə additive 13-cü miqrasiyanı tətbiq edin.
+Platforma buraxılışı: **v6.6**. TəhsilHub indi sosial təhsil icması kimi yenilənmiş dizayna malikdir: Feed ana səhifədə açılır, vahid naviqasiya desktop/tablet/mobil ekranlara uyğunlaşır. Mövcud Supabase funksiyaları və 13-cü miqrasiya qüvvədə qalır.
 
 Next.js 16 + Tailwind CSS 3 + Supabase. Mavi-ağ dizayn sistemi (tokenlər: `app/globals.css`, `tailwind.config.js`).
 
@@ -9,3 +9,4 @@ Next.js 16 + Tailwind CSS 3 + Supabase. Mavi-ağ dizayn sistemi (tokenlər: `app
 - Yerli işə salma: `.env.example` → `.env.local` → `npm ci` → `npm run dev` (Node 20.9+)
 - Testlər: `tests/pg` (real PostgreSQL), `tests/db` (köhnə), `tests/browser`
 - Lint: `npm run lint`
+

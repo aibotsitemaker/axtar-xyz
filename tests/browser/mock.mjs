@@ -7,14 +7,15 @@ const books = [book(1, 'Riyaziyyat 11-ci sinif DİM hazırlıq testləri', 12, '
 const pdf = (i, t, l, s, y) => ({ id: 'p' + i, uploader_id: 'u2', title: t, description: 'Buraxılış imtahanına hazırlaşanlar üçün sınaq testləri', level: l, subject: s, year: y, file_url: 'https://example.com/f.pdf', file_size_kb: 2048 + i * 100, view_count: i * 5, download_count: i * 2, status: 'active', created_at: now, profiles: { full_name: 'Nigar Həsənova' } });
 const pdfs = [pdf(1, 'Nərgiz Nəcəf — 250 sınaq testi', 'DİM', 'İngilis dili', 2026), pdf(2, 'Riyaziyyat konspekti', 'Bakalavr', 'Riyaziyyat', 2025), pdf(3, 'IELTS Writing nümunələri', 'IELTS', 'İngilis dili', 2024), pdf(4, 'Fizika düsturlar toplusu', 'DİM', 'Fizika', 2025)];
 const quizzes = [['q1', 'DİM Riyaziyyat — Sürətli Yoxlama', 'DİM'], ['q2', 'IELTS Grammar — Əsaslar', 'IELTS'], ['q3', 'Magistr Məntiq — Giriş Səviyyəsi', 'Magistr']].map(([id, title, category]) => ({ id, title, category, description: 'Əsas bilikləri yoxlayan qısa test.', duration_seconds: 300, is_published: true, created_at: now, quiz_questions: [{ count: 5 }] }));
-const questions = [1, 2, 3, 4, 5].map((n) => ({ id: 'qq' + n, quiz_id: 'q1', position: n, question_text: `Sual ${n}: 2x + 6 = 20 tənliyində x neçədir? (Bu mətn mobil ekranda sətirlərə bölünməlidir və daşmamalıdır.)`, options: ['5', '6', '7', '8'] }));
-const attempts = [{ id: 'a1', correct_count: 4, total_questions: 5, score_percent: 80, seconds_used: 95, created_at: now, quizzes: { title: 'DİM Riyaziyyat — Sürətli Yoxlama' } }, { id: 'a2', correct_count: 2, total_questions: 5, score_percent: 40, seconds_used: 160, created_at: now, quizzes: { title: 'IELTS Grammar — Əsaslar' } }];
+const questions = [1, 2, 3, 4, 5].map((n) => ({ id: 'qq' + n, quiz_id: 'q1', position: n, question_text: `Sual ${n}: 2x + 6 = 20 tənliyində x neçədir? (Bu mətn mobil ekranda sətirlərə bölünməlidir və daşmamalıdır.)`, options: ['5', '6', '7', '8'], question_type: 'single', points: 1 }));
+const attempts = [{ id: 'a1', correct_count: 4, total_questions: 5, score_percent: 80, earned_points: 4, max_points: 5, seconds_used: 95, created_at: now, quizzes: { title: 'DİM Riyaziyyat — Sürətli Yoxlama' } }, { id: 'a2', correct_count: 2, total_questions: 5, score_percent: 40, earned_points: 2, max_points: 5, seconds_used: 160, created_at: now, quizzes: { title: 'IELTS Grammar — Əsaslar' } }];
 const favs = [{ id: 'f1', user_id: 'u1', item_type: 'book', book_id: 'b1', pdf_id: null, created_at: now, books: books[0], pdfs: null }, { id: 'f2', user_id: 'u1', item_type: 'pdf', book_id: null, pdf_id: 'p1', created_at: now, books: null, pdfs: pdfs[0] }];
 const convs = [{ id: 'c1', user_a: 'u1', user_b: 'u2', book_id: 'b1', created_at: now, books: { title: books[0].title } }];
 const msgs = [['u2', 'Salam, kitab hələ satılıbmı?', true], ['u1', 'Salam, xeyr, hələ satılmayıb.', true], ['u2', 'Əla, sabah görüşə bilərikmi?', false], ['u1', '28 May metrosunda saat 18:00-da.', false]].map(([s, c, r], i) => ({ id: 'm' + i, conversation_id: 'c1', sender_id: s, content: c, is_read: r, created_at: new Date(Date.now() - (4 - i) * 60000).toISOString() }));
 const legal = { id: 'l1', doc_type: 'privacy_policy', title: 'Məxfilik Siyasəti', version: '1.0', language: 'az', effective_date: '2026-10-18', is_active: true, content: '# Məxfilik Siyasəti\n\n**Qüvvəyə minmə tarixi:** 18 oktyabr 2026\n\nBu siyasət şəxsi məlumatların necə işləndiyini izah edir.\n\n## 1. Toplanan məlumatlar\n\n- Qeydiyyat zamanı: ad-soyad, e-poçt ünvanı.\n- **Avtomatik** toplanan məlumatlar: IP ünvanı, brauzer növü.\n\n## 2. İstifadə məqsədləri\n\n- Hesabınızı yaratmaq və idarə etmək;\n- Xidmətin təhlükəsizliyini qorumaq.\n' };
 const tables = { books, pdfs, quizzes, quiz_questions: questions, quiz_attempts: attempts, favorites: favs, conversations: convs, chat_messages: msgs, profiles: [me, { id: 'u2', full_name: 'Nigar Həsənova' }], privacy_policy_terms: [legal] };
 const log = [];
+const quizAnswers = {}; const sessionId='mock-session';
 http.createServer((req, res) => {
   const origin = req.headers.origin || '*';
   res.setHeader('Access-Control-Allow-Origin', origin);
@@ -35,6 +36,10 @@ http.createServer((req, res) => {
       const a = body ? JSON.parse(body) : {};
       if (fn === 'unread_message_count') return send(200, 2);
       if (fn === 'check_answer') return send(200, [{ r_correct: a.p_picked === 2, r_index: 2, r_explanation: 'Tənliyi həll edək: 2x = 14, deməli x = 7.' }]);
+      if (fn === 'start_quiz_session') return send(200, [{ session_id: sessionId, started_at: now, ends_at: new Date(Date.now()+300000).toISOString(), answers: quizAnswers }]);
+      if (fn === 'save_quiz_session_answer_v2') { quizAnswers[a.p_question_id]=a.p_answer; return send(200, quizAnswers); }
+      if (fn === 'finish_quiz_session_v2') return send(200, [{ r_correct: 4, r_total: 5, r_percent: 80, r_earned_points: 4, r_max_points: 5, r_attempt_id: 'attempt-1' }]);
+      if (fn === 'quiz_session_review_v2') return send(200, questions.map(q=>({question_id:q.id,question_order:q.position,question_text:q.question_text,options:q.options,question_type:'single',picked_answer:quizAnswers[q.id]??null,correct_answers:[2],explanation:'Tənliyi həll edək: 2x = 14, deməli x = 7.',is_correct:quizAnswers[q.id]===2,points:1})));
       if (fn === 'submit_quiz_attempt') return send(200, [{ r_correct: 3, r_total: 5, r_percent: 60 }]);
       if (fn === 'get_or_create_conversation') return send(200, 'c1');
       return send(200, null);

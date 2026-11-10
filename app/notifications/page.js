@@ -8,7 +8,7 @@ import { Alert, EmptyState, ListSkeleton, LoadMore, PageHeader, Spinner } from '
 import { errText, timeAgo } from '../../lib/format';
 
 const PAGE = 20;
-const ICON = { forum_reply: 'message', forum_reply_to_reply: 'reply', moderation: 'shield', feed_like: 'heart', feed_comment: 'message', feed_mention: 'user', teacher_review: 'teacher', verification: 'shield' };
+const ICON = { forum_reply: 'message', forum_reply_to_reply: 'reply', moderation: 'shield', feed_like: 'heart', feed_comment: 'message', feed_mention: 'user', teacher_review: 'teacher', verification: 'shield', admin_announcement: 'bell' };
 
 // Sayt daxili bildirişlər (e-poçt göndərilmir). Yalnız öz bildirişləri oxunur (RLS); oxunmuş işarəsi yalnız is_read sütununu dəyişir.
 export default function NotificationsPage() {
@@ -73,7 +73,7 @@ export default function NotificationsPage() {
   const unread = rows.filter((r) => !r.is_read).length;
   return (
     <div className="mx-auto max-w-3xl">
-      <PageHeader title="Bildirişlər" subtitle="Forum, Feed, rəylər, doğrulama və moderasiya xəbərləri."
+      <PageHeader title="Bildirişlər" subtitle="Forum, Feed, rəylər, doğrulama, moderasiya və admin elanları."
         action={<button className="btn btn-secondary btn-sm" onClick={markAll} disabled={allBusy || unread === 0}>{allBusy ? <Spinner /> : <Icon name="check" className="h-4 w-4" />}Hamısını oxunmuş et</button>} />
       {err && <Alert type="error" className="mb-4">{err}</Alert>}
       {state === 'loading' ? <ListSkeleton count={3} /> : state === 'error' ? (

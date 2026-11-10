@@ -13,7 +13,7 @@ const results = []; const consoleIssues = []; const axeOut = [];
 const rec = (name, pass, detail = '') => results.push({ name, pass: !!pass, detail: String(detail).slice(0, 200) });
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-const browser = await puppeteer.launch({ args: [...chromium.args, '--no-sandbox'], executablePath: await chromium.executablePath(), headless: 'shell' });
+const browser = await puppeteer.launch({ args: [...chromium.args, '--no-sandbox'], executablePath: process.env.BROWSER_EXECUTABLE_PATH || await chromium.executablePath(), headless: 'shell' });
 
 async function open(path, { w = 1280, h = 800, auth = false } = {}) {
   const page = await browser.newPage();
@@ -37,8 +37,8 @@ const shot = (page, name, full = false) => page.screenshot({ path: `out/${name}.
 
 if (STAGE === 'layout') {
 // ---------- 1) Hər marşrut x 4 ekran: üfüqi scroll, h1 sayı, alt-sız şəkil
-const OUT = ['/', '/auth', '/auth?mode=register', '/auth/reset', '/books', '/pdfs', '/quizzes', '/legal/privacy', '/legal/terms', '/nope'];
-const IN = ['/profile', '/chat', '/chat?c=c1', '/books', '/pdfs', '/quizzes', '/'];
+const OUT = ['/', '/auth', '/auth?mode=register', '/auth/reset', '/books', '/pdfs', '/quizzes', '/search', '/feed', '/forum', '/legal/privacy', '/legal/terms', '/nope'];
+const IN = ['/profile', '/chat', '/chat?c=c1', '/books', '/pdfs', '/quizzes', '/teacher/quizzes', '/notifications', '/'];
 const VPS = [[360, 740], [390, 844], [768, 1024], [1280, 800]];
 for (const [w, h] of VPS) {
   for (const [list, auth] of [[OUT, false], [IN, true]]) {
@@ -132,9 +132,10 @@ if (STAGE === 'interact') {
   await clickText(page, 'button', 'Başla'); await page.waitForSelector('[role=group] button'); await sleep(200);
   await shot(page, 'quiz-question-mobile');
   const opts = await page.$$('[role=group] button'); await opts[0].click(); await sleep(400);
-  const wrong = await hasText(page, 'Səhv cavab') && await hasText(page, 'x = 7');
+  const autosaveUi = await hasText(page, 'Cavablar avtomatik saxlanır');
+  const keyHidden = !(await hasText(page, 'Düzgün cavab:'));
   await shot(page, 'quiz-feedback-mobile');
-  rec('sınaq: səhv cavab dərhal göstərilir + izah (serverdən)', wrong);
+  rec('sınaq: yeni axında cavab avtomatik saxlanır və açar gizlidir', autosaveUi && keyHidden);
   let guard = 0;
   while (guard++ < 12) {
     const nextBtn = await page.evaluate(() => [...document.querySelectorAll('button')].find((b) => /Növbəti sual|Nəticəni gör/.test(b.textContent)) ? true : false);
@@ -144,12 +145,12 @@ if (STAGE === 'interact') {
     const o = await page.$$('[role=group] button'); if (o[2]) { await o[2].click(); await sleep(350); }
   }
   await sleep(500);
-  const final = await hasText(page, 'Düzgün') && await hasText(page, 'Yenidən başla');
+  const final = await hasText(page, 'Bal / maksimum') && await hasText(page, 'Nəticə kabinetinizdə saxlanıldı.');
   await shot(page, 'quiz-result-mobile');
   const log = await (await fetch('http://localhost:54321/__log')).json();
   rec('sınaq: tam axın nəticə panelinə çatır', final);
-  rec('sınaq: nəticə serverə submit_quiz_attempt RPC ilə göndərilir (klientdə INSERT yoxdur)', log.some((l) => l.includes('rpc/submit_quiz_attempt')) && !log.some((l) => l.startsWith('POST /rest/v1/quiz_attempts')));
-  rec('sınaq: klient correct_index sorğulamır', !log.some((l) => l.includes('correct_index')));
+  rec('sınaq: yekun bal serverdə hesablanır (klientdə INSERT yoxdur)', log.some((l) => l.includes('rpc/finish_quiz_session_v2')) && !log.some((l) => l.startsWith('POST /rest/v1/quiz_attempts')));
+  rec('sınaq: klient cavab açarı sorğulamır', !log.some((l) => l.includes('correct_index') || l.includes('correct_answers')));
   await page.close();
 }
 { // çat (mobil)
