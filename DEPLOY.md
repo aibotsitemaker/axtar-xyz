@@ -1,6 +1,6 @@
 # TəhsilHub v5.0 — Forum, Super Admin və hesab tipi: yerləşdirmə təlimatı
 
-> Mövcud layihəni v6.6-ə yüksəldirsinizsə, həmin v5 quraşdırma addımlarını təkrarlamayın. Əlavə v6.6 bazası yeniləməsi üçün `DATABASE_MIGRATIONS.md` sənədindəki 13-cü migration təlimatına baxın.
+> Mövcud layihəni v6.7-yə yüksəldirsinizsə, həmin v5 quraşdırma addımlarını təkrarlamayın. Əlavə v6.7 bazası yeniləməsi üçün `DATABASE_MIGRATIONS.md` sənədindəki 14-cü migration təlimatına baxın.
 
 > Bu bölmə v5.0 üçündür (forum, admin paneli, qeydiyyatda müəllim/şagird/tələbə). Aşağıdakı v4.0 təlimatı (1–9) əsas quraşdırma üçün qüvvədə qalır.
 > **Heç bir SQL avtomatik işləmir və mən real production bazasına toxunmadım.** Hər şeyi əvvəlcə test layihəsində yoxlayın.
@@ -123,5 +123,6 @@ v5.0-dan etibarən admin hüququ `public.admin_users` cədvəlindədir (Auth ID-
 Hazırkı bazada 06–08 artıq tətbiq edilibsə, 09_social_trust_views.sql, 10_workflows_and_quiz_security.sql və 11_supabase_postgrest_compatibility.sql miqrasiyalarının tətbiq vəziyyətini yoxlayın. Çatışmayanları bu ardıcıllıqla icra edin; 11-ci miqrasiya 09/10 obyektlərinin mövcudluğunu yoxlayır. Ətraflı diaqnostika və Feed/Axtarış düzəlişi üçün DATABASE_MIGRATIONS.md.
 
 Vercel-də `SUPABASE_SERVICE_ROLE_KEY` və `VIEW_SESSION_SECRET` server-only environment variables kimi əlavə edin. `VIEW_SESSION_SECRET` üçün təsadüfi, ən azı 32 simvollu dəyər seçin. Bu dəyişənlərə `NEXT_PUBLIC_` prefiksi verməyin. Layihənin `.env.example` faylında adlar və izah var.
+
 
 

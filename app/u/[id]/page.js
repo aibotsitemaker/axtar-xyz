@@ -10,6 +10,7 @@ import { isUuid, loadCategories } from '../../../lib/forum';
 import { fmtDate, timeAgo } from '../../../lib/format';
 import { useAuth } from '../../../components/AuthProvider';
 import SaveContentButton from '../../../components/SaveContentButton';
+import TeacherFollowButton from '../../../components/TeacherFollowButton';
 
 // İctimai profil: yalnız ad, hesab tipi, şəhər, haqqında və forum fəaliyyəti. E-poçt və digər şəxsi məlumat göstərilmir.
 export default function PublicProfilePage() {
@@ -80,6 +81,7 @@ export default function PublicProfilePage() {
             <h1 id="u-name" className="break-words text-xl font-bold tracking-tight sm:text-2xl">{name} {profile.is_verified&&<span className="text-blue-500" title="TəhsilHub tərəfindən doğrulanıb" aria-label="Doğrulanmış hesab">✓</span>}</h1>
             <p className="mt-1.5 flex flex-wrap items-center gap-2 text-sm text-muted">
               <AccountBadge type={profile.account_type} />
+              {profile.account_type==='teacher'&&<TeacherFollowButton teacherId={id}/>}
               {profile.city && <span className="inline-flex items-center gap-1"><Icon name="pin" className="h-3.5 w-3.5" />{profile.city}</span>}
               <span>Qeydiyyat: {fmtDate(profile.created_at)}</span>
               {profile.account_type==='teacher'&&<SaveContentButton type="teacher_profile" id={id}/>}

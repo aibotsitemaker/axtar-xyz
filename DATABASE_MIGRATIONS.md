@@ -40,3 +40,9 @@ v6.3 verilənlər bazasına yeniləmə üçün 09–12 artıq tətbiq olunubsa, 
 
 13-cü fayl beş sual tipini, bal çəkisini, təhlükəsiz JSON cavab saxlama RPC-sini, serverdə yekun qiymətləndirməni, yekundan sonrakı təhlili və müəllimin öz testini yaratma/yayımlama RPC-lərini əlavə edir. Sual cavab açar sütunları API oxu icazəsindən kənarda qalır. Funksiyalar PostgREST schema cache-i `NOTIFY pgrst, 'reload schema'` ilə yeniləyir. Tətbiqdən əvvəl backup alın; miqrasiya PGlite izolyasiya testində iki dəfə tətbiq edilərək yoxlanıb, lakin canlı layihədə hələ işlədilməyib.
 
+
+## v6.7 — Feed media/sorğular, müəllim izləmə və layihələr
+
+09–13 artıq tətbiq edilmiş v6.6 DB-si üçün backup aldıqdan sonra `14_social_features.sql` faylını Supabase SQL Editor-də icra edin. Fayl mövcud postları dəyişmədən `feed_posts.post_type/media_urls`, poll seçim/səs cədvəlləri, şəxsi müəllim izləmələri, təhsil layihələri, saved project dəstəyi və `feed-media` Storage bucket/policy-lərini əlavə edir. Həmçinin media yükləmə saatlıq limiti və server-side Feed post/poll RPC-ləri yaradır.
+
+Yeni quraşdırmada ardıcıllıq 01–08 (mövcud layihə qaydasına uyğun), 09, 10, 11, 12, 13, 14-dür. 06–08-i mövcud DB-də təkrar işlətməyin. 14-cü migration PGlite izolyasiya testində iki dəfə tətbiq edilərək yoxlanıb, canlı DB-də icra edilməyib.

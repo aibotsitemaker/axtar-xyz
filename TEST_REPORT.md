@@ -1,4 +1,4 @@
-# TEST_REPORT — TəhsilHub v6.6
+# TEST_REPORT — TəhsilHub v6.7
 
 Bu hesabat v6.3–v6.5 yoxlama tarixçəsini saxlayır; cari dizayn buraxılışı və son yoxlamalar v6.6 bölməsindədir.
 
@@ -91,3 +91,9 @@ Bu hesabat v6.3–v6.5 yoxlama tarixçəsini saxlayır; cari dizayn buraxılış
 
 Final dizayn kodundan sonra `npm run lint -- --quiet` və `npm run build -- --webpack` yenidən keçdi (35/35 statik səhifə). İctimai profilə real Feed paylaşımlarının oxunuşu və görünüşü də əlavə edildi; DB sxemi və yazma axınları dəyişmədi.
 
+
+## v6.7 — yeni sosial imkanların yoxlanması
+- PGlite-də `14_social_features.sql` iki dəfə tətbiq edildi; image/question/poll postları, sorğu səsi və faizləri, yanlış media yolunun rəddi, 20/saat media limitinin 21-ci yükləməni bloklaması, teacher follow, project create və project bookmark yoxlandı.
+- `npm run lint -- --quiet` və DB suite keçdi: 75 sxem yoxlaması, 42 layihə yoxlaması, V6.2–V6.7 ssenariləri və avatar/media imza sınaqları. Production build son UI versiyasından sonra ayrıca keçirilir.
+- Brauzer screenshot və fiziki mobil test bu mühitdə browser istifadəsi bağlı olduğuna görə aparılmayıb; responsive breakpoint və DOM/CSS build səviyyəsində yoxlanıb. Canlı Supabase miqrasiyası icra edilməyib.
+Son yekun production build: `npm run build -- --webpack` uğurla keçdi; TypeScript yoxlaması, build trace və 37/37 statik səhifə tamamlandı.

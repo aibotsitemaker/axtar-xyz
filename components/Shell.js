@@ -12,6 +12,7 @@ const NAV = [
   { href: '/feed', label: 'TəhsilHub Feed', icon: 'feed' },
   { href: '/quizzes', label: 'Sınaqlar', icon: 'quiz' },
   { href: '/forum', label: 'Forum', icon: 'message' },
+  { href: '/projects', label: 'Layihələr', icon: 'project' },
   { href: '/search?q=müəllim', label: 'Müəllimlər', icon: 'teacher' },
   { href: '/books', label: 'Kitab elanları', icon: 'book' },
   { href: '/pdfs', label: 'PDF resurslar', icon: 'file' },

@@ -54,3 +54,7 @@ Yeni görünüş vahid üç sütunlu tətbiq çərçivəsi ilə quruldu. Ana sə
 Desktop 1360px-dən etibarən 3 sütun, 1024–1359px aralığında 2 sütun, 1023px və aşağıda mobil alt menyu tətbiq olunur. Mövcud funksiyaları təsdiqləyən DB suite ilə yanaşı lint və production build yenidən işlədilib. Yerli browser istifadəsi bağlı olduğundan vizual browser/screenshot və real cihaz yoxlaması aparılmayıb.
 
 İctimai müəllim/istifadəçi profilində cover üslublu başlıq və statistik kartlarla yanaşı, mövcud profil rəyləri saxlanıldı və profil sahibinin real, aktiv Feed paylaşımları göstərildi.
+
+## v6.7 — əvvəl qeyd edilən çatışmayan imkanlar (2026-11-10)
+
+Feed composer artıq mətn, şəkil, sorğu və sual seçimlərinə malikdir. Şəkil API-si auth JWT-ni yoxlayır, MIME ilə real fayl imzasını tutuşdurur, 5 MB/fayl və 20 yükləmə/saat limitini tətbiq edir; Storage siyasəti yalnız istifadəçinin öz qovluğuna yazmağa icazə verir. Sorğu postları 2–6 variant saxlayır; vote RPC-si user başına bir cavab saxlayır və nəticələri faizə çevirir. Teacher profile səhifəsində izləmə düyməsi/count, `/projects` səhifəsində müəllifin idarə etdiyi təhsil layihələri və yadda saxlama əlavə edildi. Backend dəyişiklikləri yalnız additive `14_social_features.sql` faylındadır; canlı Supabase-ə tətbiq edilməyib.

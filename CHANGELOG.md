@@ -45,3 +45,10 @@
 - Indigo design tokens, premium kartlar, empty/skeleton/focus/hover vəziyyətləri, dark mode kontrastları və sosial profil banneri əlavə edildi.
 - SEO başlıq/təsvir sosial təhsil icmasına uyğunlaşdırıldı; backend, Supabase, SQL, auth və biznes əməliyyatlarına toxunulmadı.
 
+
+## v6.7 — sosial xüsusiyyətlərin tamamlanması
+- Feed-də sual, şəkil (JPG/PNG/WebP), çoxşəkilli post və canlı səs hesablamalı sorğular əlavə edildi.
+- Yeni `14_social_features.sql` media Storage bucket/policy, saatlıq yükləmə limiti, təhlükəsiz post/sorğu RPC-ləri, müəllim izləmə və təhsil layihələri sxemini yaradır.
+- Müəllim profillərində izləmə statusu və real izləyici sayı göstərilir.
+- Layihələr səhifəsi axtarış, sahə filtri, dərc/redaktə/silmə və saved project imkanları ilə əlavə edildi.
+- Mövcud Feed postları və əvvəlki 06–13 miqrasiyaları qorunur; əlavə v6.7 addımları yalnız miqrasiya 14-dür.
