@@ -7,12 +7,16 @@ import { useAuth, LoginPrompt } from '../../components/AuthProvider';
 import Icon from '../../components/Icons';
 import { Alert, EmptyState, Modal, Spinner } from '../../components/ui';
 import { safeUrl } from '../../lib/safe';
+import AccountBadge from '../../components/AccountBadge';
+import AccountTypePicker from '../../components/AccountTypePicker';
+import { isAccountType } from '../../lib/roles';
+import { errText } from '../../lib/format';
 
 const fmtDate = (d) => new Date(d).toLocaleDateString('az-AZ', { day: '2-digit', month: '2-digit', year: 'numeric' });
 const fmtSec = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 
 export default function ProfilePage() {
-  const { user, loading } = useAuth();
+  const { user, loading, refreshMe } = useAuth();
   const router = useRouter();
   const [profile, setProfile] = useState(null);
   const [tab, setTab] = useState('books');
@@ -26,11 +30,14 @@ export default function ProfilePage() {
   const [delText, setDelText] = useState('');
   const [delBusy, setDelBusy] = useState(false);
   const [delErr, setDelErr] = useState('');
+  const [pickType, setPickType] = useState('');
+  const [typeBusy, setTypeBusy] = useState(false);
+  const [typeMsg, setTypeMsg] = useState({ type: '', text: '' });
 
   const load = useCallback(async () => {
     if (!user) return;
     const [p, b, f, d, a] = await Promise.all([
-      supabase.from('profiles').select('id, full_name, username, avatar_url, city, bio, user_type, created_at').eq('id', user.id).single(),
+      supabase.from('profiles').select('id, full_name, username, avatar_url, city, bio, created_at, account_type').eq('id', user.id).single(),
       supabase.from('books').select('*').eq('seller_id', user.id).order('created_at', { ascending: false }),
       supabase.from('favorites').select('*, books(*), pdfs(*)').eq('user_id', user.id).order('created_at', { ascending: false }),
       supabase.from('pdfs').select('*').eq('uploader_id', user.id).order('created_at', { ascending: false }),
@@ -50,6 +57,20 @@ export default function ProfilePage() {
     const { error } = await supabase.from('profiles').update(edit).eq('id', user.id);
     setMsg(error ? { type: 'error', text: error.message } : { type: 'success', text: 'Profil yeniləndi.' });
     load();
+  }
+
+  // Köhnə hesab (tipi hələ seçilməyib): tip YALNIZ BİR DƏFƏ seçilir, serverdə RPC ilə yoxlanılır. Sonra yalnız admin dəyişir.
+  async function saveType(e) {
+    e.preventDefault();
+    setTypeMsg({ type: '', text: '' });
+    if (!isAccountType(pickType)) return setTypeMsg({ type: 'error', text: 'Müəllim, şagird və ya tələbə seçin.' });
+    setTypeBusy(true);
+    const { error } = await supabase.rpc('set_my_account_type', { p_type: pickType });
+    setTypeBusy(false);
+    if (error) return setTypeMsg({ type: 'error', text: errText(error) });
+    setTypeMsg({ type: 'success', text: 'Hesab tipi saxlanıldı.' });
+    await load();
+    refreshMe();
   }
 
   async function markSold(id) { await supabase.from('books').update({ status: 'sold' }).eq('id', id); load(); }
@@ -94,10 +115,11 @@ export default function ProfilePage() {
           <div className="min-w-0">
             <h1 className="truncate text-xl font-bold tracking-tight">{profile?.full_name || 'İstifadəçi'}</h1>
             <p className="truncate text-sm text-muted">{user.email}</p>
-            {profile?.user_type && <span className="mt-1 inline-flex rounded-full bg-primary-soft px-2.5 py-1 text-xs font-medium text-primary">{({ teacher: 'Müəllim', student: 'Şagird', university_student: 'Tələbə' })[profile.user_type]}</span>}
+            {profile?.account_type && <p className="mt-1"><AccountBadge type={profile.account_type} /></p>}
           </div>
         </div>
         <div className="flex gap-2">
+          <Link href="/forum" className="btn btn-secondary btn-sm"><Icon name="message" className="h-4 w-4" />Forum</Link>
           <Link href="/chat" className="btn btn-secondary btn-sm"><Icon name="chat" className="h-4 w-4" />Mesajlar</Link>
           <button onClick={logout} className="btn btn-secondary btn-sm"><Icon name="logout" className="h-4 w-4" />Çıxış</button>
         </div>
@@ -199,6 +221,23 @@ export default function ProfilePage() {
             {msg.text && <Alert type={msg.type}>{msg.text}</Alert>}
             <button className="btn btn-primary">Yadda saxla</button>
           </form>
+
+          {profile && !profile.account_type && (
+            <form onSubmit={saveType} className="card space-y-4 p-5 sm:p-6">
+              <h2 className="text-lg font-semibold">Hesab tipini seçin</h2>
+              <p className="text-sm text-muted">Hesabınızın tipi hələ seçilməyib. Seçim forumda adınızın yanında göstəriləcək. Bunu yalnız bir dəfə edə bilərsiniz; sonradan dəyişmək üçün administrasiyaya müraciət edin.</p>
+              <AccountTypePicker value={pickType} onChange={setPickType} name="profile_account_type" />
+              {typeMsg.text && <Alert type={typeMsg.type}>{typeMsg.text}</Alert>}
+              <button className="btn btn-primary" disabled={typeBusy}>{typeBusy && <Spinner />}Seçimi saxla</button>
+            </form>
+          )}
+          {profile?.account_type && (
+            <div className="card p-5 sm:p-6">
+              <h2 className="text-lg font-semibold">Hesab tipi</h2>
+              <p className="mt-2"><AccountBadge type={profile.account_type} /></p>
+              <p className="mt-2 text-xs text-muted">Hesab tipi təhlükəsizlik üçün özbaşına dəyişdirilmir. Dəyişiklik lazımdırsa, administrasiyaya müraciət edin.</p>
+            </div>
+          )}
 
           <div className="card border-danger/30 p-5 sm:p-6">
             <h2 className="text-lg font-semibold text-danger">Hesabı sil</h2>

@@ -100,3 +100,45 @@ export function Modal({ open, onClose, title, children }) {
     </div>
   );
 }
+
+// Təsdiq pəncərəsi (destruktiv əməliyyatlar üçün). onConfirm async ola bilər; busy/error valideyndən idarə olunur.
+export function ConfirmDialog({ open, title, children, confirmLabel = 'Təsdiq et', cancelLabel = 'Ləğv et', danger = false, busy = false, error = '', onConfirm, onClose }) {
+  return (
+    <Modal open={open} onClose={() => { if (!busy) onClose(); }} title={title}>
+      <div className="mt-2 text-sm text-muted">{children}</div>
+      {error && <Alert type="error" className="mt-3">{error}</Alert>}
+      <div className="mt-5 flex justify-end gap-2">
+        <button type="button" className="btn btn-secondary" disabled={busy} onClick={onClose}>{cancelLabel}</button>
+        <button type="button" className={`btn ${danger ? 'bg-danger text-white hover:bg-danger/90' : 'btn-primary'}`} disabled={busy} onClick={onConfirm}>
+          {busy && <Spinner />}{confirmLabel}
+        </button>
+      </div>
+    </Modal>
+  );
+}
+
+export function ListSkeleton({ count = 4 }) {
+  return (
+    <div className="space-y-3" aria-busy="true" aria-label="Yüklənir">
+      {Array.from({ length: count }).map((_, i) => (
+        <div key={i} className="card space-y-3 p-4">
+          <div className="skeleton h-4 w-1/4" />
+          <div className="skeleton h-5 w-3/4" />
+          <div className="skeleton h-4 w-1/2" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// "Daha çox yüklə" düyməsi (səhifələmə). hasMore=false olduqda heç nə göstərilmir.
+export function LoadMore({ onClick, loading = false, hasMore = false, label = 'Daha çox yüklə' }) {
+  if (!hasMore) return null;
+  return (
+    <div className="mt-5 flex justify-center">
+      <button type="button" className="btn btn-secondary" onClick={onClick} disabled={loading}>
+        {loading && <Spinner />}{label}
+      </button>
+    </div>
+  );
+}

@@ -8,11 +8,11 @@ import Icon from './Icons';
 
 const NAV = [
   { href: '/', label: 'Ana səhifə', exact: true },
+  { href: '/forum', label: 'Forum' },
   { href: '/quizzes', label: 'Sınaqlar' },
   { href: '/books', label: 'Kitab elanları' },
   { href: '/pdfs', label: 'PDF arxivi' },
-  { href: '/chat', label: 'Çat' },
-  { href: '/forum', label: 'Forum' }
+  { href: '/chat', label: 'Çat' }
 ];
 
 function Logo() {
@@ -27,12 +27,11 @@ function Logo() {
 export default function Shell({ children }) {
   const path = usePathname();
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, me } = useAuth();
   const [menu, setMenu] = useState(false);
   const [drop, setDrop] = useState(false);
   const [unread, setUnread] = useState(0);
-  const [adminState, setAdminState] = useState({ id: null, value: false });
-  const isAdmin = adminState.id === user?.id && adminState.value;
+  const [notif, setNotif] = useState(0);
   const dropRef = useRef(null);
 
   const active = (n) => (n.exact ? path === n.href : path === n.href || path.startsWith(n.href + '/'));
@@ -58,12 +57,15 @@ export default function Shell({ children }) {
     return () => { stop = true; clearInterval(t); };
   }, [user, path]);
 
+  // Forum bildirişlərinin sayı (RPC mövcud deyilsə — 06 tətbiq olunmayıbsa — səssiz keçilir)
   useEffect(() => {
-    if (!user) return undefined;
-    let alive = true;
-    supabase.rpc('is_admin').then(({ data }) => { if (alive) setAdminState({ id: user.id, value: data === true }); });
-    return () => { alive = false; };
-  }, [user]);
+    if (!user) { setNotif(0); return undefined; }
+    let stop = false;
+    const load = () => supabase.rpc('unread_notification_count').then(({ data, error }) => { if (!stop && !error) setNotif(Number(data) || 0); });
+    load();
+    const t = setInterval(load, 60000);
+    return () => { stop = true; clearInterval(t); };
+  }, [user, path]);
 
   async function logout() {
     setDrop(false); setMenu(false);
@@ -81,7 +83,7 @@ export default function Shell({ children }) {
         <div className="container-page flex h-16 items-center justify-between gap-4">
           <Logo />
 
-          <nav className="hidden items-center gap-1 md:flex" aria-label="Əsas menyu">
+          <nav className="hidden items-center gap-1 lg:flex" aria-label="Əsas menyu">
             {NAV.map((n) => (
               <Link key={n.href} href={n.href} aria-current={active(n) ? 'page' : undefined}
                 className={`relative rounded-lg px-3 py-2 text-sm font-medium transition-colors ${active(n) ? 'bg-primary-soft text-primary' : 'text-muted hover:bg-canvas hover:text-ink'}`}>
@@ -93,29 +95,34 @@ export default function Shell({ children }) {
             ))}
           </nav>
 
-          <div className="hidden items-center gap-2 md:flex">
+          <div className="hidden items-center gap-2 lg:flex">
             {!user ? (
               <>
                 <Link href="/auth" className="btn btn-secondary btn-sm">Daxil ol</Link>
                 <Link href="/auth?mode=register" className="btn btn-primary btn-sm">Qeydiyyat</Link>
               </>
             ) : (
-              <div className="relative" ref={dropRef}>
+              <div className="relative flex items-center gap-2" ref={dropRef}>
+                <Link href="/notifications" className="relative grid h-10 w-10 place-items-center rounded-lg border border-line bg-surface text-muted hover:bg-canvas hover:text-ink"
+                  aria-label={notif > 0 ? `Bildirişlər (${notif} oxunmamış)` : 'Bildirişlər'}>
+                  <Icon name="bell" className="h-5 w-5" />
+                  {notif > 0 && <span className="absolute -right-1 -top-1 grid h-4 min-w-4 place-items-center rounded-full bg-primary px-1 text-[10px] font-bold text-white" aria-hidden="true">{notif > 9 ? '9+' : notif}</span>}
+                </Link>
                 <button onClick={() => setDrop(!drop)} aria-haspopup="menu" aria-expanded={drop}
                   className="flex h-10 items-center gap-2 rounded-lg border border-line bg-surface pl-1.5 pr-2.5 hover:bg-canvas">
                   <span className="grid h-7 w-7 place-items-center rounded-md bg-primary text-xs font-bold text-white">{name[0]?.toUpperCase() || 'U'}</span>
                   <Icon name="chevronDown" className="h-4 w-4 text-muted" />
                 </button>
                 {drop && (
-                  <div role="menu" className="card absolute right-0 mt-2 w-60 p-1.5 shadow-pop">
+                  <div role="menu" className="card absolute right-0 top-full z-50 mt-2 w-60 p-1.5 shadow-pop">
                     <div className="border-b border-line px-3 py-2">
                       <p className="truncate text-sm font-semibold">{user.user_metadata?.full_name || 'İstifadəçi'}</p>
                       <p className="truncate text-xs text-muted">{user.email}</p>
                     </div>
+                    {me.isAdmin && <Link role="menuitem" href="/admin" className="mt-1 flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-primary hover:bg-primary-soft"><Icon name="shield" className="h-4 w-4" />Admin paneli</Link>}
                     <Link role="menuitem" href="/profile" className="mt-1 flex items-center gap-2 rounded-lg px-3 py-2 text-sm hover:bg-canvas"><Icon name="user" className="h-4 w-4 text-muted" />Kabinet</Link>
+                    <Link role="menuitem" href="/notifications" className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm hover:bg-canvas"><Icon name="bell" className="h-4 w-4 text-muted" />Bildirişlər{notif > 0 ? ` (${notif})` : ''}</Link>
                     <Link role="menuitem" href="/chat" className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm hover:bg-canvas"><Icon name="chat" className="h-4 w-4 text-muted" />Mesajlar{unread > 0 ? ` (${unread})` : ''}</Link>
-                    <Link role="menuitem" href="/forum" className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm hover:bg-canvas">Forum</Link>
-                    {isAdmin && <Link role="menuitem" href="/admin" className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm hover:bg-canvas">İdarəetmə</Link>}
                     <button role="menuitem" onClick={logout} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-danger hover:bg-danger-soft"><Icon name="logout" className="h-4 w-4" />Çıxış</button>
                   </div>
                 )}
@@ -123,7 +130,7 @@ export default function Shell({ children }) {
             )}
           </div>
 
-          <button className="grid h-10 w-10 place-items-center rounded-lg border border-line text-ink md:hidden"
+          <button className="grid h-10 w-10 place-items-center rounded-lg border border-line text-ink lg:hidden"
             aria-label={menu ? 'Menyunu bağla' : 'Menyunu aç'} aria-expanded={menu} aria-controls="mobile-menu"
             onClick={() => setMenu(!menu)}>
             <Icon name={menu ? 'x' : 'menu'} />
@@ -131,7 +138,7 @@ export default function Shell({ children }) {
         </div>
 
         {menu && (
-          <div id="mobile-menu" className="border-t border-line bg-surface md:hidden">
+          <div id="mobile-menu" className="border-t border-line bg-surface lg:hidden">
             <nav className="container-page flex flex-col gap-1 py-3" aria-label="Mobil menyu">
               {NAV.map((n) => (
                 <Link key={n.href} href={n.href} aria-current={active(n) ? 'page' : undefined}
@@ -148,8 +155,9 @@ export default function Shell({ children }) {
                   </div>
                 ) : (
                   <>
+                    {me.isAdmin && <Link href="/admin" className="btn btn-primary"><Icon name="shield" className="h-4 w-4" />Admin paneli</Link>}
+                    <Link href="/notifications" className="btn btn-secondary"><Icon name="bell" className="h-4 w-4" />Bildirişlər{notif > 0 ? ` (${notif})` : ''}</Link>
                     <Link href="/profile" className="btn btn-secondary"><Icon name="user" className="h-4 w-4" />Kabinet</Link>
-                    <Link href="/forum" className="btn btn-secondary">Forum</Link>
                     <button onClick={logout} className="btn btn-danger"><Icon name="logout" className="h-4 w-4" />Çıxış</button>
                   </>
                 )}
@@ -165,11 +173,12 @@ export default function Shell({ children }) {
         <div className="container-page grid gap-8 py-10 sm:grid-cols-2 lg:grid-cols-4">
           <div className="lg:col-span-2">
             <Logo />
-            <p className="mt-3 max-w-sm text-sm text-muted">Sınaqlar, ikinci əl kitablar, PDF resurslar və tələbələr arasında canlı ünsiyyət — hamısı bir platformada.</p>
+            <p className="mt-3 max-w-sm text-sm text-muted">Forum, sınaqlar, ikinci əl kitablar, PDF resurslar və tələbələr arasında canlı ünsiyyət — hamısı bir platformada.</p>
           </div>
           <div>
             <h2 className="text-sm font-semibold">Platforma</h2>
             <ul className="mt-3 space-y-2 text-sm text-muted">
+              <li><Link href="/forum" className="hover:text-primary">Forum</Link></li>
               <li><Link href="/quizzes" className="hover:text-primary">Sınaqlar</Link></li>
               <li><Link href="/books" className="hover:text-primary">Kitab elanları</Link></li>
               <li><Link href="/pdfs" className="hover:text-primary">PDF arxivi</Link></li>

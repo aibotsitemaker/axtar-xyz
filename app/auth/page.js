@@ -5,22 +5,27 @@ import { useRouter } from 'next/navigation';
 import { supabase } from '../../lib/supabase';
 import Icon from '../../components/Icons';
 import { Alert, Spinner } from '../../components/ui';
-import { syncAdminCookie } from '../../components/AuthProvider';
+import { safeNext } from '../../components/AuthProvider';
+import AccountTypePicker from '../../components/AccountTypePicker';
+import { isAccountType } from '../../lib/roles';
 
 export default function AuthPage() {
   const router = useRouter();
   const [mode, setMode] = useState('login');
   const [name, setName] = useState('');
-  const [userType, setUserType] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [show, setShow] = useState(false);
   const [agree, setAgree] = useState(false);
+  const [accountType, setAccountType] = useState('');
+  const [next, setNext] = useState('');
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState({ type: '', text: '' });
 
   useEffect(() => {
-    if (new URLSearchParams(window.location.search).get('mode') === 'register') setMode('register');
+    const q = new URLSearchParams(window.location.search);
+    if (q.get('mode') === 'register') setMode('register');
+    setNext(safeNext(q.get('next')));
   }, []);
 
   function switchMode(m) { setMode(m); setMsg({ type: '', text: '' }); }
@@ -31,21 +36,29 @@ export default function AuthPage() {
     setBusy(true);
     try {
       if (mode === 'register') {
+        if (!isAccountType(accountType)) throw new Error('Qeydiyyatı tamamlamaq üçün "Mən kiməm?" bölməsindən müəllim, şagird və ya tələbə seçin.');
         if (!agree) throw new Error('Davam etmək üçün şərtlərlə razılaşmalısınız.');
-        if (!['teacher', 'student', 'university_student'].includes(userType)) throw new Error('İstifadəçi tipini seçin.');
         if (password.length < 8) throw new Error('Parol ən azı 8 simvol olmalıdır.');
-        const { data, error } = await supabase.auth.signUp({ email, password, options: { data: { full_name: name, user_type: userType } } });
+        // Seçim yalnız metadata kimi göndərilir; bazadakı trigger onu yenidən yoxlayır (yalnız 3 icazəli dəyər).
+        const { data, error } = await supabase.auth.signUp({
+          email, password,
+          options: {
+            data: { full_name: name.trim(), account_type: accountType },
+            emailRedirectTo: `${window.location.origin}${next || '/profile'}`
+          }
+        });
         if (error) throw error;
-        if (data.session) { await syncAdminCookie(data.session.access_token); router.push('/profile'); }
+        if (data.session) router.push(next || '/profile');
         else setMsg({ type: 'success', text: 'Qeydiyyat uğurludur. E-poçtunuza göndərilən təsdiq linkinə klikləyin.' });
       } else {
-        const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+        const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
-        await syncAdminCookie(data.session?.access_token);
-        router.push('/profile');
+        router.push(next || '/profile');
       }
     } catch (err) {
-      setMsg({ type: 'error', text: err.message || 'Xəta baş verdi.' });
+      const m = String(err.message || '');
+      // Trigger rədd edərsə Supabase ümumi "Database error saving new user" qaytarır
+      setMsg({ type: 'error', text: /database error saving new user/i.test(m) ? 'Qeydiyyat alınmadı. Hesab tipini (müəllim, şagird, tələbə) seçdiyinizi yoxlayın.' : m || 'Xəta baş verdi.' });
     } finally {
       setBusy(false);
     }
@@ -78,23 +91,6 @@ export default function AuthPage() {
               <input id="name" className="input" required autoComplete="name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Ad Soyad" />
             </div>
           )}
-          {mode === 'register' && (
-            <fieldset>
-              <legend className="label">Mən kiməm? <span className="text-danger">*</span></legend>
-              <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-                {[
-                  ['teacher', 'Müəllim', 'Tədris və müəllim icması'],
-                  ['student', 'Şagird', 'Məktəb və ümumi təhsil'],
-                  ['university_student', 'Tələbə', 'Universitet həyatı']
-                ].map(([value, title, detail]) => (
-                  <button key={value} type="button" aria-pressed={userType === value} onClick={() => setUserType(value)}
-                    className={`rounded-xl border p-3 text-left transition ${userType === value ? 'border-primary bg-primary-soft text-primary ring-2 ring-primary/20' : 'border-line hover:border-primary/50'}`}>
-                    <span className="block text-sm font-semibold">{title}</span><span className="mt-1 block text-xs text-muted">{detail}</span>
-                  </button>
-                ))}
-              </div>
-            </fieldset>
-          )}
           <div>
             <label htmlFor="email" className="label">E-poçt</label>
             <input id="email" type="email" className="input" required autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="ad@mail.com" />
@@ -114,6 +110,7 @@ export default function AuthPage() {
             </div>
             {mode === 'register' && <p className="hint">Ən azı 8 simvol.</p>}
           </div>
+          {mode === 'register' && <AccountTypePicker value={accountType} onChange={setAccountType} />}
           {mode === 'register' && (
             <label className="flex items-start gap-2.5 text-sm text-muted">
               <input type="checkbox" className="mt-0.5 h-4 w-4 rounded border-line accent-primary" checked={agree} onChange={(e) => setAgree(e.target.checked)} />

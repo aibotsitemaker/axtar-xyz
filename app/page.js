@@ -4,6 +4,7 @@ import HomeLive, { HomeCta } from '../components/HomeLive';
 import Icon from '../components/Icons';
 
 const SERVICES = [
+  { href: '/forum', icon: 'message', title: 'Forum', text: 'Mövzu açın, sual verin, təcrübə bölüşün və digər istifadəçilərlə müzakirə edin.' },
   { href: '/quizzes', icon: 'quiz', title: 'Onlayn sınaqlar', text: 'DİM, Magistr və IELTS üçün taymerli testlər, dərhal nəticə və izahlar.' },
   { href: '/books', icon: 'book', title: 'Kitab bazarı', text: 'İkinci əl dərslik və kitabları şəhər və kateqoriyaya görə tapın və ya satın.' },
   { href: '/pdfs', icon: 'file', title: 'PDF arxivi', text: 'Pillə, fənn və ilə görə konspekt və resursları axtarın, baxın, yükləyin.' },
@@ -41,7 +42,7 @@ export default function Home() {
         </div>
       </section>
 
-      <section aria-label="Xidmətlər" className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <section aria-label="Xidmətlər" className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
         {SERVICES.map((s) => (
           <Link key={s.href} href={s.href} className="card group p-5 transition-shadow hover:shadow-pop">
             <div className="mb-4 grid h-11 w-11 place-items-center rounded-lg bg-primary-soft text-primary transition-colors group-hover:bg-primary group-hover:text-white">

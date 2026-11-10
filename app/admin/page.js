@@ -1,132 +1,117 @@
 'use client';
 import { useCallback, useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { supabase } from '../../lib/supabase';
-import { useAuth } from '../../components/AuthProvider';
-import { Alert, PageHeader } from '../../components/ui';
+import StatCard from '../../components/admin/StatCard';
+import Icon from '../../components/Icons';
+import { Alert, ListSkeleton, PageHeader, Spinner } from '../../components/ui';
+import { actionLabel, STATUS_BADGE } from '../../lib/admin';
+import { errText, timeAgo } from '../../lib/format';
 
-export default function AdminPage() {
-  const { user, loading } = useAuth(); const router = useRouter();
-  const [checking, setChecking] = useState(true); const [allowed, setAllowed] = useState(false); const [data, setData] = useState({}); const [error, setError] = useState('');
-  const [userSearch, setUserSearch] = useState('');
-  const [userFrom, setUserFrom] = useState(''); const [userTo, setUserTo] = useState('');
-  const [userTypeFilter, setUserTypeFilter] = useState('all');
-  const [userSort, setUserSort] = useState('created_desc');
-  const [userPage, setUserPage] = useState(1);
-  const [forumTopicPage, setForumTopicPage] = useState(1); const [forumReplyPage, setForumReplyPage] = useState(1); const [reportPage, setReportPage] = useState(1);
-  const [selectedUser, setSelectedUser] = useState(null); const [userNote, setUserNote] = useState(''); const [userDetailsBusy, setUserDetailsBusy] = useState(false);
-  const [categoryName, setCategoryName] = useState('');
-  const [quizTitle, setQuizTitle] = useState(''); const [quizDescription, setQuizDescription] = useState(''); const [quizCategory, setQuizCategory] = useState('DİM'); const [quizDuration, setQuizDuration] = useState(600); const [quizQuestions, setQuizQuestions] = useState('[{"question_text":"Sual?","options":["A","B"],"correct_index":0,"explanation":""}]'); const [quizBusy, setQuizBusy] = useState(false);
+function Section({ title, children, id }) {
+  return (
+    <section aria-labelledby={id} className="mb-8">
+      <h2 id={id} className="mb-3 text-lg font-semibold">{title}</h2>
+      {children}
+    </section>
+  );
+}
+
+// Bütün rəqəmlər admin_dashboard_stats() RPC-sindən (real verilənlər bazası) gəlir.
+export default function AdminDashboard() {
+  const [stats, setStats] = useState(null);
+  const [err, setErr] = useState('');
+  const [busy, setBusy] = useState(true);
+
   const load = useCallback(async () => {
-    if (!user) return;
-    const { data: sessionData } = await supabase.auth.getSession();
-    const headers = { Authorization: `Bearer ${sessionData.session?.access_token || ''}` };
-    const [auth, profiles, topics, replies, reports, categories, audit, totalUsers, teachers, students, universityStudents, totalTopics, openReports, books, pdfs, forumReplies, attachments, quizzes, legalDocs] = await Promise.all([
-      supabase.rpc('is_admin'),
-      fetch(`/api/admin/users?q=${encodeURIComponent(userSearch)}&type=${userTypeFilter}&from=${userFrom}&to=${userTo}&page=${userPage}&sort=${userSort}`, { headers }).then((r) => r.json()),
-      supabase.from('forum_topics').select('id,title,body,author_id,is_pinned,is_locked,deleted_at,created_at').order('created_at', { ascending: false }).range((forumTopicPage - 1) * 100, forumTopicPage * 100 - 1),
-      supabase.from('forum_replies').select('id', { count: 'exact', head: true }),
-      supabase.from('forum_reports').select('id,reporter_id,topic_id,reply_id,reason,status,created_at').order('created_at', { ascending: false }).range((reportPage - 1) * 100, reportPage * 100 - 1),
-      supabase.from('forum_categories').select('id,name,is_active').order('name'),
-      supabase.from('admin_audit_log').select('id,action,target_type,target_id,created_at').order('created_at', { ascending: false }).limit(30),
-      supabase.from('profiles').select('id', { count: 'exact', head: true }),
-      supabase.from('profiles').select('id', { count: 'exact', head: true }).eq('user_type', 'teacher'),
-      supabase.from('profiles').select('id', { count: 'exact', head: true }).eq('user_type', 'student'),
-      supabase.from('profiles').select('id', { count: 'exact', head: true }).eq('user_type', 'university_student'),
-      supabase.from('forum_topics').select('id', { count: 'exact', head: true }).is('deleted_at', null),
-      supabase.from('forum_reports').select('id', { count: 'exact', head: true }).eq('status', 'open'),
-      supabase.from('books').select('id,title,description,status,created_at').order('created_at', { ascending: false }).limit(100),
-      supabase.from('pdfs').select('id,title,description,status,created_at').order('created_at', { ascending: false }).limit(100),
-      supabase.from('forum_replies').select('id,topic_id,author_id,body,deleted_at,created_at').order('created_at', { ascending: false }).range((forumReplyPage - 1) * 100, forumReplyPage * 100 - 1),
-      supabase.from('forum_attachments').select('id,topic_id,storage_path,file_name,mime_type,size_bytes,forum_topics(title)').order('created_at', { ascending: false }).limit(100),
-      fetch('/api/admin/content?kind=quiz', { headers }).then((r) => r.json()),
-      fetch('/api/admin/content?kind=legal', { headers }).then((r) => r.json())
-    ]);
-    setChecking(false); setAllowed(auth.data === true);
-    if (auth.data !== true) { setError('Admin səlahiyyəti təsdiqlənmədi.'); return; }
-    if (profiles.error || topics.error || reports.error) setError('Bəzi məlumatlar yüklənmədi. Miqrasiyanı və server secret-i yoxlayın.');
-    setData({ users: profiles.users || [], userHasMore: profiles.hasMore === true, userScanLimited: profiles.scannedLimit === true, totalUsers: totalUsers.count || 0, teachers: teachers.count || 0, students: students.count || 0, universityStudents: universityStudents.count || 0, totalTopics: totalTopics.count || 0, openReports: openReports.count || 0, topics: topics.data || [], replies: replies.count || 0, forumReplies: forumReplies.data || [], attachments: attachments.data || [], books: books.data || [], pdfs: pdfs.data || [], quizzes: quizzes.items || [], legalDocs: legalDocs.items || [], reports: reports.data || [], categories: categories.data || [], audit: audit.data || [] });
-  }, [user, userSearch, userTypeFilter, userFrom, userTo, userSort, userPage, forumTopicPage, forumReplyPage, reportPage]);
-  useEffect(() => { if (loading) return undefined; if (!user) { router.replace('/auth'); return undefined; } const timer = setTimeout(() => load(), 0); return () => clearTimeout(timer); }, [loading, user, load, router]);
+    setBusy(true);
+    setErr('');
+    const { data, error } = await supabase.rpc('admin_dashboard_stats');
+    setBusy(false);
+    if (error || !data) { setErr(errText(error, 'Statistika yüklənmədi. 07 SQL miqrasiyasının işləndiyini yoxlayın.')); return; }
+    setStats(data);
+  }, []);
 
-  async function patchTopic(id, patch) { const { error: e } = await supabase.from('forum_topics').update(patch).eq('id', id); if (e) setError(e.message); else load(); }
-  async function patchReply(id, patch) { const { error: e } = await supabase.from('forum_replies').update(patch).eq('id', id); if (e) setError(e.message); else load(); }
-  async function editTopic(t) { const title = window.prompt('Mövzunun başlığı', t.title); if (!title?.trim()) return; const body = window.prompt('Mövzunun mətni', t.body); if (body === null) return; await patchTopic(t.id, { title: title.trim(), body: body.trim() }); }
-  async function editReply(r) { const body = window.prompt('Cavabın mətni', r.body); if (!body?.trim()) return; await patchReply(r.id, { body: body.trim() }); }
-  async function deleteAttachment(id, storagePath) { if (!window.confirm('Əlavə mövzudan və Storage-dan silinsin?')) return; const removed = await supabase.storage.from('tehsilhub-forum-files').remove([storagePath]); if (removed.error) { setError(removed.error.message); return; } const { error: e } = await supabase.from('forum_attachments').delete().eq('id', id); if (e) setError(e.message); else load(); }
-  async function reportStatus(id, status) { const { error: e } = await supabase.from('forum_reports').update({ status, reviewed_by: user.id, reviewed_at: new Date().toISOString() }).eq('id', id); if (e) setError(e.message); else load(); }
-  async function categoryStatus(id, is_active) { const { error: e } = await supabase.from('forum_categories').update({ is_active }).eq('id', id); if (e) setError(e.message); else load(); }
-  async function categoryAdd(e) {
-    e.preventDefault();
-    const slug = categoryName.toLowerCase().replace(/ə/g, 'e').replace(/ı/g, 'i').replace(/ö/g, 'o').replace(/ü/g, 'u').replace(/ş/g, 's').replace(/ç/g, 'c').replace(/ğ/g, 'g').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-    const { error: e2 } = await supabase.from('forum_categories').insert({ name: categoryName.trim(), slug });
-    if (e2) setError(e2.message); else { setCategoryName(''); load(); }
-  }
-  async function categoryRename(c) { const name = window.prompt('Yeni kateqoriya adı', c.name); if (!name || name.trim() === c.name) return; const { error: e } = await supabase.from('forum_categories').update({ name: name.trim() }).eq('id', c.id); if (e) setError(e.message); else load(); }
-  async function contentEdit(table, item) { const title = window.prompt('Yeni başlıq', item.title); if (!title?.trim()) return; const description = window.prompt('Təsvir', item.description || '') ?? item.description; const { error: e } = await supabase.from(table).update({ title: title.trim(), description }).eq('id', item.id); if (e) setError(e.message); else load(); }
-  async function contentStatus(table, id, status) { const { error: e } = await supabase.from(table).update({ status }).eq('id', id); if (e) setError(e.message); else load(); }
-  async function userAction(id, action, user_type) {
-    const { data: sessionData } = await supabase.auth.getSession();
-    const response = await fetch('/api/admin/users', { method: 'PATCH', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${sessionData.session?.access_token || ''}` }, body: JSON.stringify({ id, action, user_type }) });
-    const result = await response.json(); if (!response.ok) setError(result.error || 'Əməliyyat alınmadı.'); else { setError(''); load(); }
-  }
-  async function contentRequest(method, kind, payload = {}) {
-    const { data: s } = await supabase.auth.getSession();
-    const response = await fetch('/api/admin/content', { method, headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${s.session?.access_token || ''}` }, body: method === 'GET' ? undefined : JSON.stringify({ kind, ...payload }) });
-    const result = await response.json(); if (!response.ok) { setError(result.error || 'Məzmun əməliyyatı alınmadı.'); return false; } setError(''); await load(); return true;
-  }
-  async function createQuiz(e) {
-    e.preventDefault(); setQuizBusy(true);
-    let questions;
-    try { questions = JSON.parse(quizQuestions); } catch { setError('Suallar JSON formatında deyil.'); setQuizBusy(false); return; }
-    const ok = await contentRequest('POST', 'quiz', { quiz: { title: quizTitle, description: quizDescription, category: quizCategory, duration_seconds: Number(quizDuration), is_published: false }, questions });
-    if (ok) { setQuizTitle(''); setQuizDescription(''); }
-    setQuizBusy(false);
-  }
-  async function editQuiz(q) {
-    const title = window.prompt('Sınağın yeni adı', q.title); if (!title?.trim()) return;
-    const description = window.prompt('Qısa təsvir', q.description || ''); if (description === null) return;
-    const questions = window.prompt('Sualları JSON formatında redaktə edin. Nəticə tarixçəsi olan sınaqların sualları dəyişdirilə bilməz.', JSON.stringify((q.quiz_questions || []).sort((a, b) => a.position - b.position).map(({ question_text, options, correct_index, explanation }) => ({ question_text, options, correct_index, explanation })), null, 2));
-    if (questions === null) return;
-    let parsed; try { parsed = JSON.parse(questions); } catch { setError('Suallar JSON formatında deyil.'); return; }
-    await contentRequest('PATCH', 'quiz', { id: q.id, patch: { title: title.trim(), description }, questions: parsed });
-  }
-  async function editLegal(doc) { const title = window.prompt('Sənədin başlığı', doc.title); if (!title?.trim()) return; const content = window.prompt('Sənədin tam mətni', doc.content); if (content === null) return; await contentRequest('PATCH', 'legal', { id: doc.id, patch: { title: title.trim(), content } }); }
-  async function viewUser(id) {
-    setUserDetailsBusy(true); setUserNote('');
-    const { data: s } = await supabase.auth.getSession();
-    const response = await fetch(`/api/admin/users?userId=${encodeURIComponent(id)}`, { headers: { Authorization: `Bearer ${s.session?.access_token || ''}` } });
-    const result = await response.json();
-    if (!response.ok) setError(result.error || 'Profil yüklənmədi.'); else setSelectedUser(result);
-    setUserDetailsBusy(false);
-  }
-  async function addUserNote(e) {
-    e.preventDefault(); if (!selectedUser) return;
-    const { data: s } = await supabase.auth.getSession();
-    const response = await fetch('/api/admin/users', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${s.session?.access_token || ''}` }, body: JSON.stringify({ userId: selectedUser.profile.id, note: userNote }) });
-    const result = await response.json();
-    if (!response.ok) setError(result.error || 'Qeyd saxlanmadı.'); else { setError(''); setUserNote(''); setSelectedUser((old) => ({ ...old, notes: [result.note, ...old.notes] })); }
-  }
+  useEffect(() => { load(); }, [load]);
 
-  if (loading || checking) return <div className="skeleton h-64" aria-busy="true" />;
-  if (!allowed) return <div className="mx-auto max-w-lg"><Alert type="error">{error || 'Bu səhifəyə giriş icazəniz yoxdur.'}</Alert></div>;
-  const card = 'card p-4';
-  return <div><PageHeader title="İdarəetmə paneli" subtitle="İstifadəçi profilləri, forum məzmunu, şikayətlər və audit qeydləri." />
-    {error && <Alert type="error" className="mt-4">{error}</Alert>}
-    <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-6">{[
-      ['İstifadəçi sayı', data.totalUsers || 0], ['Müəllim', data.teachers || 0], ['Şagird', data.students || 0], ['Tələbə', data.universityStudents || 0], ['Aktiv mövzu / cavab', `${data.totalTopics || 0} / ${data.replies || 0}`], ['Açıq şikayət', data.openReports || 0]
-    ].map(([name, value]) => <div className={card} key={name}><p className="text-xs text-muted">{name}</p><p className="mt-1 text-2xl font-bold">{value}</p></div>)}</div>
-    <div className="mt-3 flex flex-wrap items-end gap-3"><label className="text-xs text-muted">Qeydiyyat tarixindən<input type="date" className="input mt-1" value={userFrom} onChange={(e) => { setUserFrom(e.target.value); setUserPage(1); }} /></label><label className="text-xs text-muted">Qeydiyyat tarixinədək<input type="date" className="input mt-1" value={userTo} onChange={(e) => { setUserTo(e.target.value); setUserPage(1); }} /></label></div>
-    <section className="mt-7"><h2 className="text-xl font-bold">İstifadəçilər</h2><div className="mt-3 grid gap-2 sm:grid-cols-3"><input className="input" aria-label="İstifadəçi axtarışı" placeholder="Ad və ya e-poçt üzrə axtar" value={userSearch} onChange={(e) => { setUserSearch(e.target.value); setUserPage(1); }} /><select className="input" aria-label="İstifadəçi tipi filtri" value={userTypeFilter} onChange={(e) => { setUserTypeFilter(e.target.value); setUserPage(1); }}><option value="all">Bütün tiplər</option><option value="teacher">Müəllim</option><option value="student">Şagird</option><option value="university_student">Tələbə</option></select><select className="input" aria-label="Qeydiyyat tarixinə görə sırala" value={userSort} onChange={(e) => { setUserSort(e.target.value); setUserPage(1); }}><option value="created_desc">Ən yeni qeydiyyat</option><option value="created_asc">Ən köhnə qeydiyyat</option></select></div><div className="mt-3 overflow-x-auto rounded-xl border border-line bg-surface"><table className="w-full min-w-[1000px] text-left text-sm"><thead className="bg-canvas text-xs text-muted"><tr><th className="p-3">Ad / profil</th><th className="p-3">E-poçt</th><th className="p-3">Tip</th><th className="p-3">Qeydiyyat</th><th className="p-3">Hesab</th><th className="p-3">Əməliyyat</th></tr></thead><tbody>{data.users?.map((p) => <tr className="border-t border-line" key={p.id}><td className="max-w-56 p-3">{p.full_name || '—'}<div className="truncate text-xs text-muted">{[p.username && `@${p.username}`, p.city, p.bio].filter(Boolean).join(' · ')}</div></td><td className="p-3">{p.email}</td><td className="p-3"><select className="input max-w-44" value={p.user_type} onChange={(e) => userAction(p.id, 'set_type', e.target.value)}><option value="teacher">Müəllim</option><option value="student">Şagird</option><option value="university_student">Tələbə</option></select></td><td className="p-3">{new Date(p.created_at).toLocaleDateString('az-AZ')}</td><td className="p-3">{p.banned_until ? 'Bloklanıb' : 'Aktiv'}{!p.email_confirmed && <div className="text-xs text-muted">E-poçt təsdiqsiz</div>}</td><td className="p-3"><div className="flex gap-2"><button className="btn btn-secondary btn-sm" onClick={() => viewUser(p.id)}>Profilə bax</button><button className="btn btn-secondary btn-sm" onClick={() => userAction(p.id, p.banned_until ? 'unban' : 'ban')}>{p.banned_until ? 'Blokdan çıxar' : 'Blokla'}</button><button className="btn btn-danger btn-sm" onClick={() => window.confirm(`${p.email} hesabı və profili silinsin?`) && userAction(p.id, 'delete')}>Sil</button></div></td></tr>)}</tbody></table>{!data.users?.length && <p className="p-4 text-sm text-muted">İstifadəçi tapılmadı.</p>}</div>{selectedUser && <div className="card mt-3 space-y-3 p-4"><div className="flex items-start justify-between gap-3"><div><h3 className="font-semibold">{selectedUser.profile.full_name || 'Profil'} · {selectedUser.profile.email}</h3><p className="text-sm text-muted">{selectedUser.profile.username ? `@${selectedUser.profile.username} · ` : ''}{selectedUser.profile.city || 'Şəhər göstərilməyib'} · {selectedUser.profile.user_type} · {selectedUser.profile.email_confirmed ? 'E-poçt təsdiqlənib' : 'E-poçt təsdiqsiz'}</p><p className="mt-1 text-sm">{selectedUser.profile.bio || 'Bio əlavə edilməyib.'}</p></div><button className="btn btn-secondary btn-sm" onClick={() => setSelectedUser(null)}>Bağla</button></div><form className="flex flex-col gap-2 sm:flex-row" onSubmit={addUserNote}><textarea className="input min-h-16 flex-1" required minLength={1} maxLength={2000} placeholder="Yalnız adminlərin görə biləcəyi daxili qeyd" value={userNote} onChange={(e) => setUserNote(e.target.value)} /><button className="btn btn-primary shrink-0">Qeyd əlavə et</button></form><div className="space-y-2">{selectedUser.notes?.map((n) => <div className="rounded-lg bg-canvas p-3 text-sm" key={n.id}>{n.note}<time className="mt-1 block text-xs text-muted">{new Date(n.created_at).toLocaleString('az-AZ')}</time></div>)}{!selectedUser.notes?.length && <p className="text-sm text-muted">Admin qeydi yoxdur.</p>}</div></div>}{userDetailsBusy && <p className="mt-2 text-sm text-muted">Profil yüklənir…</p>}<div className="mt-3 flex items-center justify-between"><span className="text-xs text-muted">Səhifə {userPage} · ümumi hesab sayı {data.totalUsers || 0}</span><div className="flex gap-2"><button className="btn btn-secondary btn-sm" disabled={userPage <= 1} onClick={() => setUserPage((n) => n - 1)}>Əvvəlki</button><button className="btn btn-secondary btn-sm" disabled={!data.userHasMore} onClick={() => setUserPage((n) => n + 1)}>Növbəti</button></div></div>{data.userScanLimited && <p className="mt-2 text-xs text-muted">Nəticələrin skanı 10 000 Auth hesabı ilə məhdudlaşıb.</p>}<p className="mt-2 text-xs text-muted">Hesab şifrələri admin panelində görünmür.</p></section>
-    <section className="mt-7"><h2 className="text-xl font-bold">Forum mövzuları</h2><div className="mt-3 space-y-2">{data.topics?.map((t) => <div className={`${card} flex flex-wrap items-center justify-between gap-3`} key={t.id}><span className="min-w-0 flex-1 truncate font-medium">{t.title}{t.deleted_at && <span className="ml-2 text-xs text-danger">Gizlədilib</span>}</span><div className="flex flex-wrap gap-2"><button className="btn btn-secondary btn-sm" onClick={() => editTopic(t)}>Redaktə</button><button className="btn btn-secondary btn-sm" onClick={() => patchTopic(t.id, { is_pinned: !t.is_pinned })}>{t.is_pinned ? 'Sabitdən çıxar' : 'Sabitlə'}</button><button className="btn btn-secondary btn-sm" onClick={() => patchTopic(t.id, { is_locked: !t.is_locked })}>{t.is_locked ? 'Aç' : 'Bağla'}</button><button className="btn btn-secondary btn-sm" onClick={() => patchTopic(t.id, { deleted_at: t.deleted_at ? null : new Date().toISOString() })}>{t.deleted_at ? 'Bərpa et' : 'Gizlət'}</button></div></div>)}</div><div className="mt-3 flex justify-end gap-2"><span className="self-center text-xs text-muted">Səhifə {forumTopicPage}</span><button className="btn btn-secondary btn-sm" disabled={forumTopicPage <= 1} onClick={() => setForumTopicPage((n) => n - 1)}>Əvvəlki</button><button className="btn btn-secondary btn-sm" disabled={(data.topics?.length || 0) < 100} onClick={() => setForumTopicPage((n) => n + 1)}>Növbəti</button></div></section>
-    <section className="mt-7"><h2 className="text-xl font-bold">Forum cavabları</h2><div className="mt-3 space-y-2">{data.forumReplies?.map((r) => <div className={`${card} flex flex-wrap items-center justify-between gap-3`} key={r.id}><a className="min-w-0 flex-1 truncate text-sm hover:text-primary" href={`/forum/${r.topic_id}`}>{r.body}</a><button className="btn btn-secondary btn-sm" onClick={() => editReply(r)}>Redaktə</button><button className="btn btn-secondary btn-sm" onClick={() => patchReply(r.id, { deleted_at: r.deleted_at ? null : new Date().toISOString() })}>{r.deleted_at ? 'Bərpa et' : 'Gizlət'}</button></div>)}</div><div className="mt-3 flex justify-end gap-2"><span className="self-center text-xs text-muted">Səhifə {forumReplyPage}</span><button className="btn btn-secondary btn-sm" disabled={forumReplyPage <= 1} onClick={() => setForumReplyPage((n) => n - 1)}>Əvvəlki</button><button className="btn btn-secondary btn-sm" disabled={(data.forumReplies?.length || 0) < 100} onClick={() => setForumReplyPage((n) => n + 1)}>Növbəti</button></div></section>
-    <section className="mt-7"><h2 className="text-xl font-bold">Forum faylları <span className="text-sm font-normal text-muted">(son 100)</span></h2><div className="mt-3 space-y-2">{data.attachments?.map((a) => <div className={`${card} flex flex-wrap items-center justify-between gap-3`} key={a.id}><span className="min-w-0 flex-1 truncate text-sm">{a.file_name} · {a.forum_topics?.title || 'Mövzu silinib'}</span><button className="btn btn-danger btn-sm" onClick={() => deleteAttachment(a.id, a.storage_path)}>Faylı sil</button></div>)}</div></section>
-    <section className="mt-7"><h2 className="text-xl font-bold">Sınaqların idarəsi</h2><form onSubmit={createQuiz} className="card mt-3 space-y-3 p-4"><h3 className="font-semibold">Yeni sınaq</h3><input className="input" required minLength={3} maxLength={180} placeholder="Sınağın adı" value={quizTitle} onChange={(e) => setQuizTitle(e.target.value)} /><textarea className="input min-h-20" maxLength={3000} placeholder="Təsvir" value={quizDescription} onChange={(e) => setQuizDescription(e.target.value)} /><div className="grid gap-2 sm:grid-cols-2"><select className="input" value={quizCategory} onChange={(e) => setQuizCategory(e.target.value)}>{['DİM','Magistr','IELTS','Universitet','Digər'].map((c) => <option key={c}>{c}</option>)}</select><input className="input" type="number" min={30} max={14400} required value={quizDuration} onChange={(e) => setQuizDuration(e.target.value)} aria-label="Müddət saniyə ilə" /></div><label className="block"><span className="label">Suallar JSON formatında (2–6 cavab variantı, correct_index sıfırdan başlayır)</span><textarea className="input min-h-40 font-mono text-xs" required value={quizQuestions} onChange={(e) => setQuizQuestions(e.target.value)} /></label><button className="btn btn-primary" disabled={quizBusy}>{quizBusy ? 'Yaradılır…' : 'Qaralama kimi yarat'}</button></form><div className="mt-3 space-y-2">{data.quizzes?.map((q) => <div className={`${card} flex flex-wrap items-center justify-between gap-3`} key={q.id}><span className="min-w-0 flex-1 truncate">{q.title} · {q.category} · {q.quiz_questions?.length || 0} sual · {q.is_published ? 'Dərc olunub' : 'Qaralama'}</span><div className="flex gap-2"><button className="btn btn-secondary btn-sm" onClick={() => editQuiz(q)}>Sınaq və sualları redaktə et</button><button className="btn btn-secondary btn-sm" onClick={() => contentRequest('PATCH', 'quiz', { id: q.id, patch: { is_published: !q.is_published } })}>{q.is_published ? 'Gizlət' : 'Dərc et'}</button><button className="btn btn-danger btn-sm" onClick={() => window.confirm(`“${q.title}” sınağı silinsin? Nəticə tarixçəsi varsa silinmə bloklanacaq.`) && contentRequest('DELETE', 'quiz', { id: q.id })}>Sil</button></div></div>)}</div></section>
-    <section className="mt-7"><h2 className="text-xl font-bold">Hüquqi sənədlər</h2><div className="mt-3 space-y-2">{data.legalDocs?.map((doc) => <div className={`${card} flex flex-wrap items-center justify-between gap-3`} key={doc.id}><span className="min-w-0 flex-1 truncate">{doc.title} · {doc.version} · {doc.is_active ? 'Aktiv' : 'Arxiv'}</span><div className="flex gap-2"><button className="btn btn-secondary btn-sm" onClick={() => editLegal(doc)}>Redaktə et</button><button className="btn btn-secondary btn-sm" onClick={() => contentRequest('PATCH', 'legal', { id: doc.id, patch: { is_active: !doc.is_active } })}>{doc.is_active ? 'Deaktiv et' : 'Aktiv et'}</button></div></div>)}</div></section>
-    <section className="mt-7"><h2 className="text-xl font-bold">Şikayətlər</h2><div className="mt-3 space-y-2">{!data.reports?.length && reportPage === 1 && <div className={card}>Şikayət yoxdur.</div>}{data.reports?.map((r) => <div className={card} key={r.id}><div className="flex flex-wrap justify-between gap-2"><span className="text-sm">{r.reason}</span><span className="text-xs text-muted">{r.status} · {new Date(r.created_at).toLocaleString('az-AZ')}</span></div><div className="mt-3 flex gap-2"><button className="btn btn-secondary btn-sm" onClick={() => reportStatus(r.id, 'reviewed')}>Baxıldı</button><button className="btn btn-secondary btn-sm" onClick={() => reportStatus(r.id, 'dismissed')}>Rədd et</button></div></div>)}</div><div className="mt-3 flex justify-end gap-2"><span className="self-center text-xs text-muted">Səhifə {reportPage}</span><button className="btn btn-secondary btn-sm" disabled={reportPage <= 1} onClick={() => setReportPage((n) => n - 1)}>Əvvəlki</button><button className="btn btn-secondary btn-sm" disabled={(data.reports?.length || 0) < 100} onClick={() => setReportPage((n) => n + 1)}>Növbəti</button></div></section>
-    <section className="mt-7"><h2 className="text-xl font-bold">Kateqoriyalar</h2><form onSubmit={categoryAdd} className="mt-3 flex max-w-xl gap-2"><input className="input" required minLength={2} maxLength={80} placeholder="Yeni kateqoriya" value={categoryName} onChange={(e) => setCategoryName(e.target.value)} /><button className="btn btn-primary shrink-0">Əlavə et</button></form><div className="mt-3 grid gap-2 sm:grid-cols-2">{data.categories?.map((c) => <div className={`${card} flex items-center justify-between gap-3`} key={c.id}><span>{c.name}</span><div className="flex gap-2"><button className="btn btn-secondary btn-sm" onClick={() => categoryRename(c)}>Adı dəyiş</button><button className="btn btn-secondary btn-sm" onClick={() => categoryStatus(c.id, !c.is_active)}>{c.is_active ? 'Deaktiv et' : 'Aktiv et'}</button></div></div>)}</div></section>
-    <section className="mt-7"><div className="flex items-center justify-between gap-3"><h2 className="text-xl font-bold">Kitab elanları</h2><a className="btn btn-secondary btn-sm" href="/books">Yeni kitab əlavə et</a></div><div className="mt-3 space-y-2">{data.books?.map((b) => <div className={`${card} flex flex-wrap items-center justify-between gap-3`} key={b.id}><span className="min-w-0 flex-1 truncate">{b.title}</span><button className="btn btn-secondary btn-sm" onClick={() => contentEdit('books', b)}>Redaktə et</button><select className="input max-w-36" value={b.status} onChange={(e) => contentStatus('books', b.id, e.target.value)}><option value="active">Aktiv</option><option value="sold">Satılıb</option><option value="hidden">Gizli</option></select><button className="btn btn-danger btn-sm" onClick={() => window.confirm(`“${b.title}” kitab elanı və şəkilləri silinsin?`) && contentRequest('DELETE', 'book', { id: b.id })}>Sil</button></div>)}</div></section>
-    <section className="mt-7"><div className="flex items-center justify-between gap-3"><h2 className="text-xl font-bold">PDF resursları</h2><a className="btn btn-secondary btn-sm" href="/pdfs">Yeni PDF əlavə et</a></div><div className="mt-3 space-y-2">{data.pdfs?.map((p) => <div className={`${card} flex flex-wrap items-center justify-between gap-3`} key={p.id}><span className="min-w-0 flex-1 truncate">{p.title}</span><button className="btn btn-secondary btn-sm" onClick={() => contentEdit('pdfs', p)}>Redaktə et</button><select className="input max-w-36" value={p.status} onChange={(e) => contentStatus('pdfs', p.id, e.target.value)}><option value="active">Aktiv</option><option value="hidden">Gizli</option></select><button className="btn btn-danger btn-sm" onClick={() => window.confirm(`“${p.title}” PDF resursu silinsin?`) && contentRequest('DELETE', 'pdf', { id: p.id })}>Sil</button></div>)}</div></section>
-    <section className="mt-7"><h2 className="text-xl font-bold">Son audit qeydləri</h2><div className="mt-3 space-y-2">{!data.audit?.length && <div className={card}>Hələ audit qeydi yoxdur.</div>}{data.audit?.map((x) => <div className={`${card} flex justify-between gap-3 text-sm`} key={x.id}><span>{x.action} · {x.target_type} · {x.target_id}</span><time className="shrink-0 text-xs text-muted">{new Date(x.created_at).toLocaleString('az-AZ')}</time></div>)}</div></section>
-  </div>;
+  const u = stats?.users || {};
+  const f = stats?.forum || {};
+  const c = stats?.content || {};
+  return (
+    <div>
+      <PageHeader title="Dashboard" subtitle="Platformanın cari vəziyyəti (canlı verilənlər bazasından)."
+        action={<button className="btn btn-secondary btn-sm" onClick={load} disabled={busy}>{busy ? <Spinner /> : <Icon name="rotate" className="h-4 w-4" />}Yenilə</button>} />
+      {err && <Alert type="error" className="mb-4">{err}</Alert>}
+      {!stats && busy && <ListSkeleton count={3} />}
+      {stats && (
+        <>
+          <Section title="İstifadəçilər" id="d-users">
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+              <StatCard label="Ümumi istifadəçi" value={u.total} href="/admin/users" />
+              <StatCard label="Müəllim" value={u.teacher} href="/admin/users?type=teacher" />
+              <StatCard label="Şagird" value={u.student} href="/admin/users?type=student" />
+              <StatCard label="Tələbə" value={u.university_student} href="/admin/users?type=university_student" />
+              <StatCard label="Tipi seçilməyib (köhnə hesablar)" value={u.unspecified} href="/admin/users?type=none" />
+              <StatCard label="Son 7 gündə qeydiyyat" value={u.new_7d} />
+              <StatCard label="Hazırda bloklanmış" value={u.blocked_now} href="/admin/users?state=blocked" tone="warn" />
+              <StatCard label="Adminlər" value={u.admins} href="/admin/admins" />
+            </div>
+          </Section>
+
+          <Section title="Forum" id="d-forum">
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+              <StatCard label="Aktiv mövzu" value={f.topics_active} href="/admin/forum?status=active" />
+              <StatCard label="Cavab (aktiv)" value={f.replies_active} />
+              <StatCard label="Son 7 gündə mövzu" value={f.topics_7d} />
+              <StatCard label="Açıq şikayət" value={f.open_reports} href="/admin/reports" tone="danger" />
+              <StatCard label="Şikayət edilmiş mövzu" value={f.reported_topics} href="/admin/reports" tone="warn" />
+              <StatCard label="Gizli mövzu" value={f.topics_hidden} href="/admin/forum?status=hidden" />
+              <StatCard label="Silinmiş mövzu" value={f.topics_deleted} href="/admin/forum?status=deleted" />
+              <StatCard label="Sabit / bağlı mövzu" value={f.topics_pinned === undefined ? null : `${f.topics_pinned} / ${f.topics_locked}`} />
+            </div>
+          </Section>
+
+          <Section title="Məzmun" id="d-content">
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+              <StatCard label="Aktiv elan" value={c.books_active} href="/admin/content?tab=books" />
+              <StatCard label="Aktiv PDF" value={c.pdfs_active} href="/admin/content?tab=pdfs" />
+              <StatCard label="Sınaq" value={c.quizzes} href="/admin/content?tab=quizzes" />
+            </div>
+          </Section>
+
+          <div className="grid gap-6 lg:grid-cols-2">
+            <Section title="Son mövzular" id="d-topics">
+              {(stats.recent_topics || []).length === 0 ? <p className="card px-4 py-6 text-center text-sm text-muted">Hələ mövzu yoxdur.</p> : (
+                <ul className="card divide-y divide-line">
+                  {stats.recent_topics.map((t) => (
+                    <li key={t.id} className="flex items-start justify-between gap-3 px-4 py-3">
+                      <div className="min-w-0">
+                        <Link href={`/forum/${t.id}`} className="block break-words text-sm font-medium hover:text-primary hover:underline">{t.title}</Link>
+                        <p className="mt-0.5 text-xs text-muted">{t.author_name || 'Silinmiş istifadəçi'} · {timeAgo(t.created_at)} · {t.reply_count} cavab</p>
+                      </div>
+                      {t.status !== 'active' && <span className="badge badge-muted shrink-0">{STATUS_BADGE[t.status] || t.status}</span>}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </Section>
+
+            <Section title="Son admin fəaliyyətləri" id="d-activity">
+              {(stats.recent_activity || []).length === 0 ? <p className="card px-4 py-6 text-center text-sm text-muted">Hələ qeyd olunan əməliyyat yoxdur.</p> : (
+                <ul className="card divide-y divide-line">
+                  {stats.recent_activity.map((a) => (
+                    <li key={a.id} className="px-4 py-3">
+                      <p className="text-sm font-medium">{actionLabel(a.action)}</p>
+                      <p className="mt-0.5 break-words text-xs text-muted">{a.actor_label || 'Sistem'}{a.target_label ? ` → ${a.target_label}` : ''} · {timeAgo(a.created_at)}</p>
+                    </li>
+                  ))}
+                  <li className="px-4 py-2.5 text-right"><Link href="/admin/audit" className="text-sm font-semibold text-primary hover:underline">Bütün jurnal</Link></li>
+                </ul>
+              )}
+            </Section>
+          </div>
+        </>
+      )}
+    </div>
+  );
 }

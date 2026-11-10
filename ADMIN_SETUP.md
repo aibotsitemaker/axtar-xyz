@@ -1,30 +1,26 @@
-# Təhlükəsiz Super Admin qurulması
+# Super Admin qurulması — elielizade17@gmail.com
 
-## Tələb olunan ardıcıllıq
+## Təhlükəsizlik modeli
+- Admin hüququ **e-poçt mətninə və ya `profiles.role`-a bağlı deyil**. O, `public.admin_users` cədvəlində **Auth istifadəçi ID-sinə (`auth.users.id`)** bağlı qeyddir.
+- Brauzerdən (anon/authenticated rolları) `admin_users`-ə yazmaq mümkün deyil: cədvəl RLS ilə bağlıdır, yazma icazəsi yoxdur və trigger `super` səviyyəsini yalnız SQL Editor kontekstində qəbul edir.
+- Hər admin RPC-si icra olunanda bazada `assert_admin` ilə yoxlanır; interfeysdəki gizlətmə yalnız rahatlıq üçündür. `/admin` səhifələri admin təsdiqlənməyənə qədər heç bir admin sorğusu göndərmir.
+- Hesab silinib eyni e-poçtla yenidən yaradılsa, **yeni hesab admin olmur** (ID dəyişir). Testlərdə yoxlanıb.
+- Təsdiqlənməmiş e-poçtla Super Admin təyin etmək mümkün deyil (08 xəta verir).
 
-1. Supabase Auth-da `elielizade17@gmail.com` ünvanı ilə adi qeydiyyat edin və e-poçtu təsdiqləyin. Hesab yoxdursa, əvvəlcə hesab yaradılmalıdır.
-2. Test Supabase layihəsində aşağıdakı miqrasiyaları ardıcıllıqla icra edin: `01_supabase_schema.sql`, `02_hardening_phase1.sql`, `04_grants.sql`, `05_backfill_profiles.sql`, `06_forum_roles_admin.sql`, sonda `03_hardening_phase2.sql`.
-3. Təsdiqlənmiş hesab mövcud olduqdan sonra SQL Editor-da aşağıdakı SQL-i bir dəfə icra edin:
+## Addımlar
+1. 06 və 07 miqrasiyaları icra olunub (DEPLOY.md, B).
+2. Saytda `https://www.axtar.xyz/auth?mode=register` → `elielizade17@gmail.com` ilə **adi qeydiyyat** (Mən kiməm? seçimi məcburidir; admin tipi yoxdur). Supabase Dashboard-dan "Add user" ilə yaratmayın.
+3. Gələn e-poçtdakı təsdiq linkinə klikləyin.
+4. Supabase → SQL Editor → `08_bootstrap_super_admin.sql` faylını açıb icra edin. Uğurlu olarsa sonda `level = super`, `email_confirmed = true` olan bir sətir görünür. Hesab yoxdursa/təsdiqlənməyibsə fayl aydın xəta verir və heç nə dəyişmir.
+5. Saytdan çıxıb yenidən daxil olun → menyuda **Admin paneli** görünür → `/admin`.
+6. Audit jurnalında (`/admin/audit`) `Super Admin təyin edildi (SQL)` qeydi görünməlidir.
 
-```sql
-insert into public.platform_admins(user_id)
-select id
-from auth.users
-where lower(email) = 'elielizade17@gmail.com'
-  and email_confirmed_at is not null
-on conflict (user_id) do nothing;
-```
+## Sonrakı adminlər
+Super Admin → `/admin/users/[id]` və ya `/admin/admins` → "Admin et". Hüquq yalnız Super Admin tərəfindən verilir/ləğv olunur və audit jurnalına yazılır.
 
-4. SQL Editor-də `select p.user_id, u.email from public.platform_admins p join auth.users u on u.id=p.user_id;` sorğusu ilə düzgün hesabın əlavə olunduğunu yoxlayın. Həmin hesabla sayta daxil olub `/admin` səhifəsini açın. Production-a keçməzdən əvvəl test layihəsində sınayın.
+## Qoruyucular
+- Sonuncu Super Admin silinə və ya aşağı salına bilməz (trigger). Admin hesabı (o cümlədən özünüzünkü) kabinetdən "Hesabı sil" ilə silinə bilməz — əvvəlcə admin hüququ ləğv edilməlidir. Admin panelindən hesab silmək üçün hesabın e-poçtunu yazmaq tələb olunur.
+- Audit jurnalı dəyişdirilə/silinə bilməz (SQL Editor-da belə UPDATE/DELETE/TRUNCATE trigger ilə bloklanır). Parol, token, açar sahələri jurnalda təmizlənir. Admin panelində parol göstərilmir.
 
-## Server secret
-
-İstifadəçi siyahısı ad/e-poçt axtarışı, tip və qeydiyyat tarix aralığı filtrlərini, həmçinin qeydiyyat tarixinə görə sıralamanı dəstəkləyir.
-
-Auth Admin API-ni yalnız server route-dan istifadə etmək üçün Vercel server environment-ə `SUPABASE_SERVICE_ROLE_KEY` əlavə edin. Bu açarı `NEXT_PUBLIC_` adı ilə açıqlamayın və repoya və ya ZIP-ə daxil etməyin. `.env.example` faylında yalnız dəyişənin adı nümunə kimi verilib.
-
-Admin API hər sorğuda Supabase access token-i yoxlayır və Auth user ID-sini `platform_admins` cədvəli ilə tutuşdurur. `/admin` səhifəsi əlavə olaraq serverdə `HttpOnly` sessiya cookie-sini, tokeni və admin reyestrini yoxlayır. Cookie yalnız admin üçün verilir və Auth sessiyası yenilənəndə yenilənir. İcazə client e-poçtuna, `profiles.role` sahəsinə və ya göndərilmiş admin flag-ə əsaslanmır. Admin əməliyyatlarının audit xülasəsi `admin_audit_log` cədvəlinə yazılır. Şifrə, token və service key jurnala düşmür.
-
-Paneldə Auth hesablarını axtarmaq, tipə görə süzmək və qeydiyyat tarixinə görə sıralamaq mümkündür. Siyahı 25 hesablıq səhifələnir; axtarış skanı ən çox 10 000 Auth hesabı əhatə edir. Admin profillərə baxa və yalnız adminlərin görə bildiyi daxili qeydlər yaza, hesabı müvəqqəti bloklaya/aça, istifadəçi tipini dəyişə və hesabı silə bilər. Forum mövzusu, cavabı və şikayət 100 sətirlik səhifələrlə nəzərdən keçirilir; məzmunu redaktə/gizlət/bərpa etmək, mövzunu sabitləmək/bağlamaq, şikayətə nəticə yazmaq və kateqoriyanı idarə etmək mümkündür. Kitab və PDF elanları redaktə/gizlədilir/silinir; qaralama sınaq yaradılır, sual tarixçəsi pozulmayacaq hallarda redaktə, dərc və silinmə mümkündür. Nəticə tarixçəsi olan sınağın sualları dəyişdirilmir və sınaq silinmir; onu gizlətmək olar. Hüquqi sənədlər redaktə və aktiv/deaktiv edilir. Öz hesabını bloklamaq və ya silmək qadağandır; API yeganə Super Admin hesabının silinməsini bloklayır. Bloklama aktiv access token-i müddəti bitənədək dərhal etibarsız etməyə bilər.
-
-Admin hüququnu ləğv etmək üçün SQL Editor-də `delete from public.platform_admins where user_id = '…';` sorğusunu müvafiq ID ilə icra edin. Adi istifadəçilərin bu cədvələ INSERT/UPDATE/DELETE icazəsi yoxdur. Son adminin silinməsi platformanı adminsiz qoyar; yeni təsdiqlənmiş admin əlavə edilməyənədək bunu etməyin.
+## Geri çəkmək
+`delete from public.admin_users where user_id = (select id from auth.users where lower(email) = 'elielizade17@gmail.com');` (yalnız başqa Super Admin varsa mümkündür.)

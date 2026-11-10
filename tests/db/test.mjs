@@ -3,11 +3,9 @@ import { PGlite } from '@electric-sql/pglite';
 import { pg_trgm } from '@electric-sql/pglite/contrib/pg_trgm';
 import { pgcrypto } from '@electric-sql/pglite/contrib/pgcrypto';
 import fs from 'fs';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 
-const R = fileURLToPath(new URL('../../', import.meta.url));
-const sql = (f) => fs.readFileSync(path.join(R, f), 'utf8');
+const R = new URL('../../', import.meta.url).pathname;
+const sql = (f) => fs.readFileSync(R + f, 'utf8');
 
 const STUBS = `
 create role anon nologin; create role authenticated nologin; create role service_role nologin bypassrls;

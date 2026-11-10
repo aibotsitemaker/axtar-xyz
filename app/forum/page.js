@@ -1,126 +1,192 @@
 'use client';
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../components/AuthProvider';
-import { Alert, PageHeader } from '../../components/ui';
+import Icon from '../../components/Icons';
+import AuthorLine from '../../components/forum/AuthorLine';
+import { Alert, EmptyState, ListSkeleton, LoadMore, PageHeader } from '../../components/ui';
+import { PAGE_SIZE, TOPIC_COLS, loadCategories, loadProfiles, searchTerm } from '../../lib/forum';
+import { fmtDate, timeAgo } from '../../lib/format';
 
-const labels = { teacher: 'Müəllim', student: 'Şagird', university_student: 'Tələbə' };
+const SORTS = [['activity', 'Son aktiv'], ['replies', 'Ən çox cavab alan'], ['new', 'Yeni mövzular']];
+const SORT_KEYS = SORTS.map((s) => s[0]);
+
+function TopicRow({ t, cat, author, lastAuthor }) {
+  return (
+    <article className="card p-4 transition-shadow hover:shadow-pop sm:p-5">
+      <div className="flex items-start gap-4">
+        <div className="min-w-0 flex-1">
+          <div className="mb-1.5 flex flex-wrap items-center gap-2">
+            {t.is_pinned && <span className="badge"><Icon name="pushpin" className="h-3 w-3" />Sabit</span>}
+            {t.is_locked && <span className="badge badge-muted"><Icon name="lock" className="h-3 w-3" />Bağlı</span>}
+            {cat && <span className="badge badge-muted">{cat.name}</span>}
+          </div>
+          <h2 className="text-base font-semibold leading-snug sm:text-lg">
+            <Link href={`/forum/${t.id}`} className="hover:text-primary hover:underline">{t.title}</Link>
+          </h2>
+          {t.excerpt && <p className="mt-1 line-clamp-2 break-words text-sm text-muted">{t.excerpt}</p>}
+          <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-muted">
+            <AuthorLine id={t.author_id} profile={author} />
+            <span>{fmtDate(t.created_at)}</span>
+            <span className="inline-flex items-center gap-1"><Icon name="clock" className="h-3.5 w-3.5" />Son aktivlik: {timeAgo(t.last_activity_at)}</span>
+            {t.reply_count > 0 && t.last_reply_author_id && (
+              <span>Son cavab: <span className="font-medium text-ink">{lastAuthor?.full_name || 'İstifadəçi'}</span></span>
+            )}
+          </div>
+        </div>
+        <div className="shrink-0 rounded-lg bg-canvas px-3 py-2 text-center" aria-label={`${t.reply_count} cavab`}>
+          <div className="text-lg font-bold leading-none text-ink">{t.reply_count}</div>
+          <div className="mt-1 text-[11px] text-muted">cavab</div>
+        </div>
+      </div>
+    </article>
+  );
+}
+
+function buildQuery(f, from, to) {
+  let q = supabase.from('forum_topics').select(TOPIC_COLS, from === 0 ? { count: 'exact' } : undefined).eq('status', 'active');
+  if (f.cat) q = q.eq('category_id', f.cat);
+  const term = searchTerm(f.q);
+  if (term) q = q.or(`title.ilike.%${term}%,excerpt.ilike.%${term}%`);
+  q = q.order('is_pinned', { ascending: false });
+  if (f.sort === 'replies') q = q.order('reply_count', { ascending: false }).order('last_activity_at', { ascending: false });
+  else if (f.sort === 'new') q = q.order('created_at', { ascending: false });
+  else q = q.order('last_activity_at', { ascending: false });
+  return q.range(from, to);
+}
 
 export default function ForumPage() {
-  const { user, loading } = useAuth();
-  const router = useRouter();
-  const [topics, setTopics] = useState([]);
-  const [categories, setCategories] = useState([]);
+  const { user } = useAuth();
+  const [cats, setCats] = useState([]);
+  const [catsReady, setCatsReady] = useState(false);
+  const [filters, setFilters] = useState(null); // { q, cat, sort }
+  const [draft, setDraft] = useState('');
+  const [rows, setRows] = useState([]);
   const [profiles, setProfiles] = useState({});
-  const [counts, setCounts] = useState({});
-  const [notifications, setNotifications] = useState([]);
-  const [category, setCategory] = useState('');
-  const [sort, setSort] = useState('recent');
-  const [search, setSearch] = useState('');
-  const [more, setMore] = useState(false);
-  const [open, setOpen] = useState(false);
-  const [title, setTitle] = useState('');
-  const [body, setBody] = useState('');
-  const [categoryId, setCategoryId] = useState('');
-  const [files, setFiles] = useState([]);
-  const [busy, setBusy] = useState(false);
-  const [notice, setNotice] = useState({ type: '', text: '' });
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [moreLoading, setMoreLoading] = useState(false);
+  const [error, setError] = useState('');
 
-  const load = useCallback(async () => {
-    const [c, t] = await Promise.all([
-      supabase.from('forum_categories').select('id,name,slug').eq('is_active', true).order('name'),
-      supabase.rpc('forum_search_topics', { p_query: search || null, p_category_id: category ? Number(category) : null, p_sort: sort, p_offset: 0, p_limit: more ? 60 : 30 })
-    ]);
-    if (c.error || t.error) { setNotice({ type: 'error', text: 'Forum məlumatları yüklənmədi. Miqrasiyanın tətbiq olunduğunu yoxlayın.' }); return; }
-    const rows = t.data || [];
-    setCategories(c.data || []); setTopics(rows);
-    const statsResult = rows.length ? await supabase.rpc('forum_topic_stats', { p_topic_ids: rows.map((x) => x.id) }) : { data: [] };
-    const stats = Object.fromEntries((statsResult.data || []).map((x) => [x.topic_id, { count: Number(x.reply_count), last: x.last_author_id }]));
-    setCounts(Object.fromEntries(rows.map((topic) => [topic.id, stats[topic.id] || { count: 0, last: null }])));
-    const ids = [...new Set([...rows.map((x) => x.author_id), ...Object.values(stats).map((x) => x.last)].filter(Boolean))];
-    if (ids.length) { const p = await supabase.from('profiles').select('id,full_name,user_type').in('id', ids); setProfiles(Object.fromEntries((p.data || []).map((x) => [x.id, x]))); }
-    if (user) {
-      const n = await supabase.from('forum_notifications').select('id,topic_id,created_at').eq('user_id', user.id).eq('is_read', false).order('created_at', { ascending: false }).limit(10);
-      setNotifications(n.data || []);
-    } else setNotifications([]);
-  }, [more, user, search, category, sort]);
+  useEffect(() => {
+    let stop = false;
+    loadCategories().then((c) => { if (!stop) { setCats(c); setCatsReady(true); } });
+    return () => { stop = true; };
+  }, []);
 
-  useEffect(() => { const timer = setTimeout(() => load(), 0); return () => clearTimeout(timer); }, [load]);
+  // Başlanğıc filtrlər ünvandan oxunur (?category=slug&q=...&sort=...)
+  useEffect(() => {
+    if (!catsReady || filters) return;
+    const sp = new URLSearchParams(window.location.search);
+    const slug = sp.get('category');
+    const c = cats.find((x) => x.slug === slug);
+    const sort = SORT_KEYS.includes(sp.get('sort')) ? sp.get('sort') : 'activity';
+    const q = (sp.get('q') || '').slice(0, 60);
+    setDraft(q);
+    setFilters({ q, cat: c ? c.id : '', sort });
+  }, [catsReady, cats, filters]);
 
-  const visible = topics;
+  const attach = useCallback(async (list) => {
+    const ids = list.flatMap((t) => [t.author_id, t.last_reply_author_id]);
+    const map = await loadProfiles(ids);
+    setProfiles((p) => ({ ...p, ...map }));
+  }, []);
 
-  async function createTopic(e) {
-    e.preventDefault(); setNotice({ type: '', text: '' });
-    if (busy) return;
-    if (!user) { router.push('/auth'); return; }
-    if (files.length > 4 || files.some((file) => file.size > 5 * 1024 * 1024 || !['image/jpeg', 'image/png', 'image/webp', 'application/pdf'].includes(file.type))) {
-      setNotice({ type: 'error', text: 'Ən çox 4 JPG, PNG, WEBP və ya PDF faylı seçin; hər biri 5 MB-dan kiçik olmalıdır.' }); return;
-    }
-    setBusy(true);
-    const { data: topic, error } = await supabase.from('forum_topics').insert({ author_id: user.id, category_id: Number(categoryId), title: title.trim(), body: body.trim() }).select('id').single();
-    if (error) { setBusy(false); setNotice({ type: 'error', text: error.message || 'Mövzu yaradılmadı.' }); return; }
-    const uploaded = []; const metadata = [];
-    for (const file of files) {
-      const safeName = file.name.replace(/[^\p{L}\p{N}._-]+/gu, '_').slice(-150) || 'forum-file';
-      const storagePath = `${user.id}/${topic.id}/${crypto.randomUUID()}-${safeName}`;
-      const upload = await supabase.storage.from('tehsilhub-forum-files').upload(storagePath, file, { contentType: file.type, upsert: false });
-      if (upload.error) { if (uploaded.length) await supabase.storage.from('tehsilhub-forum-files').remove(uploaded); await supabase.from('forum_topics').update({ deleted_at: new Date().toISOString() }).eq('id', topic.id); setBusy(false); setNotice({ type: 'error', text: `Fayl yüklənmədi: ${upload.error.message}` }); return; }
-      uploaded.push(storagePath); metadata.push({ topic_id: topic.id, uploader_id: user.id, storage_path: storagePath, file_name: file.name.slice(0, 180), mime_type: file.type, size_bytes: file.size });
-    }
-    if (metadata.length) {
-      const saved = await supabase.from('forum_attachments').insert(metadata);
-      if (saved.error) { if (uploaded.length) await supabase.storage.from('tehsilhub-forum-files').remove(uploaded); await supabase.from('forum_topics').update({ deleted_at: new Date().toISOString() }).eq('id', topic.id); setBusy(false); setNotice({ type: 'error', text: `Fayl məlumatı saxlanmadı: ${saved.error.message}` }); return; }
-    }
-    setBusy(false); setTitle(''); setBody(''); setCategoryId(''); setFiles([]); setOpen(false); setNotice({ type: 'success', text: 'Mövzu yaradıldı.' }); await load();
-  }
-  async function markNotificationsRead() {
-    if (!user || !notifications.length) return;
-    const { error } = await supabase.from('forum_notifications').update({ is_read: true }).eq('user_id', user.id).eq('is_read', false);
-    if (error) setNotice({ type: 'error', text: error.message }); else setNotifications([]);
+  useEffect(() => {
+    if (!filters) return undefined;
+    let stop = false;
+    setLoading(true);
+    setError('');
+    buildQuery(filters, 0, PAGE_SIZE - 1).then(async ({ data, error: err, count }) => {
+      if (stop) return;
+      if (err) { setError('Mövzuları yükləmək mümkün olmadı. Bir az sonra yenidən cəhd edin.'); setRows([]); setTotal(0); setLoading(false); return; }
+      setRows(data || []);
+      setTotal(count ?? (data || []).length);
+      await attach(data || []);
+      if (!stop) setLoading(false);
+    });
+    return () => { stop = true; };
+  }, [filters, attach]);
+
+  function update(next) {
+    const f = { ...filters, ...next };
+    setFilters(f);
+    const sp = new URLSearchParams();
+    const c = cats.find((x) => x.id === f.cat);
+    if (c) sp.set('category', c.slug);
+    if (f.q) sp.set('q', f.q);
+    if (f.sort !== 'activity') sp.set('sort', f.sort);
+    const qs = sp.toString();
+    window.history.replaceState(null, '', qs ? `/forum?${qs}` : '/forum');
   }
 
-  if (loading) return <div className="skeleton h-64" aria-busy="true" />;
-  return <div>
-    <PageHeader title="Forum" subtitle="Mövzu açın, təcrübə bölüşün və suallara birlikdə cavab tapın." />
-    {notice.text && <Alert type={notice.type}>{notice.text}</Alert>}
-    {notifications.length > 0 && <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-primary/20 bg-primary-soft p-3 text-sm"><span>Sizə yeni cavablarla bağlı {notifications.length} bildiriş var.</span><button className="text-xs font-semibold text-primary underline" onClick={markNotificationsRead}>Oxunmuş kimi işarələ</button></div>}
-    <div className="card mt-5 flex flex-col gap-3 p-4 sm:flex-row">
-      <input aria-label="Forumda axtar" className="input flex-1" placeholder="Mövzularda axtar..." value={search} onChange={(e) => setSearch(e.target.value)} />
-      <select aria-label="Kateqoriya" className="input sm:max-w-56" value={category} onChange={(e) => setCategory(e.target.value)}><option value="">Bütün kateqoriyalar</option>{categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select>
-      <select aria-label="Sıralama" className="input sm:max-w-48" value={sort} onChange={(e) => setSort(e.target.value)}><option value="recent">Son aktiv</option><option value="replies">Ən çox cavab</option><option value="new">Ən yeni</option></select>
-      <button className="btn btn-primary shrink-0" onClick={() => user ? setOpen(!open) : router.push('/auth')}>{open ? 'Bağla' : '+ Yeni mövzu'}</button>
-    </div>
-    {open && <form onSubmit={createTopic} className="card mt-4 space-y-3 p-4 sm:p-5">
-      <h2 className="font-semibold">Yeni müzakirə</h2>
-      <label className="block"><span className="label">Başlıq</span><input className="input" required minLength={8} maxLength={160} value={title} onChange={(e) => setTitle(e.target.value)} /></label>
-      <label className="block"><span className="label">Kateqoriya</span><select className="input" required value={categoryId} onChange={(e) => setCategoryId(e.target.value)}><option value="">Seçin</option>{categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></label>
-      <label className="block"><span className="label">Mətn</span><textarea className="input min-h-32" required minLength={10} maxLength={12000} value={body} onChange={(e) => setBody(e.target.value)} /></label>
-      <label className="block"><span className="label">Şəkil və PDF əlavələri (istəyə görə, ən çox 4)</span><input className="input" type="file" accept="image/jpeg,image/png,image/webp,application/pdf" multiple onChange={(e) => setFiles(Array.from(e.target.files || []).slice(0, 4))} /><span className="hint">JPG, PNG, WEBP və PDF · hər fayl ən çox 5 MB</span></label>
-      {files.length > 0 && <p className="text-xs text-muted">Seçildi: {files.map((f) => f.name).join(', ')}</p>}
-      <p className="text-xs text-muted">Maksimum 12 000 simvol. HTML və skript kimi deyil, adi mətn kimi göstərilir.</p>
-      <button disabled={busy} className="btn btn-primary">{busy ? 'Yaradılır…' : 'Mövzunu dərc et'}</button>
-    </form>}
-    <div className="mt-5 space-y-3">
-      {!visible.length && <div className="card p-10 text-center text-sm text-muted">{topics.length ? 'Axtarışa uyğun mövzu tapılmadı.' : 'Hələ mövzu yoxdur. İlk müzakirəni siz başladın.'}</div>}
-      {visible.map((t) => {
-        const owner = profiles[t.author_id]; const info = counts[t.id] || { count: 0, last: null };
-        return <article key={t.id} className="card p-4 sm:p-5">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div className="min-w-0 flex-1"><div className="mb-2 flex flex-wrap gap-2">{t.is_pinned && <span className="badge bg-primary-soft text-primary">Sabitlənib</span>}<span className="badge bg-canvas text-muted">{categories.find((c) => c.id === t.category_id)?.name || 'Kateqoriya'}</span>{t.is_locked && <span className="badge bg-canvas text-muted">Bağlıdır</span>}</div>
-              <Link href={`/forum/${t.id}`} className="text-lg font-semibold hover:text-primary">{t.title}</Link><p className="mt-2 line-clamp-2 whitespace-pre-wrap text-sm text-muted">{t.body}</p>
-            </div><div className="shrink-0 text-right text-xs text-muted">{info.count} cavab{info.count === 1 ? '' : ''}</div>
+  async function more() {
+    setMoreLoading(true);
+    const { data, error: err } = await buildQuery(filters, rows.length, rows.length + PAGE_SIZE - 1);
+    if (err) { setError('Daha çox mövzu yüklənmədi.'); setMoreLoading(false); return; }
+    // təkrarlanan sətirlər (yeni mövzu gələndə sürüşmə) süzülür
+    const seen = new Set(rows.map((r) => r.id));
+    const add = (data || []).filter((r) => !seen.has(r.id));
+    setRows((r) => [...r, ...add]);
+    await attach(add);
+    setMoreLoading(false);
+  }
+
+  const catMap = Object.fromEntries(cats.map((c) => [c.id, c]));
+  const hasFilter = filters && (filters.q || filters.cat);
+  const newHref = user ? '/forum/new' : '/auth?next=/forum/new';
+
+  return (
+    <div>
+      <PageHeader title="Forum" subtitle="Suallar verin, təcrübə bölüşün, digər istifadəçilərlə müzakirə edin."
+        action={<Link href={newHref} className="btn btn-primary"><Icon name="plus" className="h-4 w-4" />Yeni mövzu yarat</Link>} />
+
+      <form role="search" aria-label="Forumda axtarış" className="card mb-5 grid gap-3 p-4 sm:grid-cols-[1fr_auto_auto]"
+        onSubmit={(e) => { e.preventDefault(); if (filters) update({ q: searchTerm(draft) }); }}>
+        <div className="relative">
+          <label htmlFor="forum-q" className="sr-only">Axtarış</label>
+          <Icon name="search" className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
+          <input id="forum-q" type="search" className="input pl-9" placeholder="Mövzu axtarın..." maxLength={60} value={draft} onChange={(e) => setDraft(e.target.value)} />
+        </div>
+        <div>
+          <label htmlFor="forum-cat" className="sr-only">Kateqoriya</label>
+          <select id="forum-cat" className="input" value={filters?.cat || ''} disabled={!filters} onChange={(e) => update({ cat: e.target.value })}>
+            <option value="">Bütün kateqoriyalar</option>
+            {cats.map((c) => <option key={c.id} value={c.id}>{c.name}{c.is_active ? '' : ' (arxiv)'}</option>)}
+          </select>
+        </div>
+        <div>
+          <label htmlFor="forum-sort" className="sr-only">Çeşidləmə</label>
+          <select id="forum-sort" className="input" value={filters?.sort || 'activity'} disabled={!filters} onChange={(e) => update({ sort: e.target.value })}>
+            {SORTS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+          </select>
+        </div>
+        <div className="flex items-center justify-between gap-3 sm:col-span-3">
+          <p className="text-xs text-muted" aria-live="polite">{loading ? 'Yüklənir…' : `${total} mövzu`}</p>
+          <div className="flex gap-2">
+            <button className="btn btn-primary btn-sm">Axtar</button>
+            {hasFilter && (
+              <button type="button" className="btn btn-secondary btn-sm" onClick={() => { setDraft(''); update({ q: '', cat: '' }); }}>Filtrləri təmizlə</button>
+            )}
           </div>
-          <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-line pt-3 text-xs text-muted">
-            <span>{owner?.full_name || 'İstifadəçi'} {owner?.user_type && <span className="ml-1 rounded-full bg-primary-soft px-2 py-0.5 text-primary">{labels[owner.user_type]}</span>}</span>
-            <time dateTime={t.created_at}>{new Date(t.created_at).toLocaleDateString('az-AZ')}</time>
-            {info.last && <span>Son cavab: {profiles[info.last]?.full_name || 'İstifadəçi'}</span>}
-            <Link className="ml-auto font-medium text-primary hover:underline" href={`/forum/${t.id}`}>Müzakirəyə keç →</Link>
-          </div>
-        </article>;
-      })}
+        </div>
+      </form>
+
+      {error && <Alert type="error" className="mb-4">{error}</Alert>}
+
+      {loading ? <ListSkeleton /> : rows.length === 0 && !error ? (
+        <EmptyState icon="chat" title={hasFilter ? 'Heç nə tapılmadı' : 'Hələ mövzu yoxdur'}
+          text={hasFilter ? 'Axtarış sözünü və ya kateqoriyanı dəyişin.' : 'İlk mövzunu siz yaradın və müzakirəni başladın.'}
+          action={<Link href={newHref} className="btn btn-primary">Yeni mövzu yarat</Link>} />
+      ) : (
+        <div className="space-y-3">
+          {rows.map((t) => (
+            <TopicRow key={t.id} t={t} cat={catMap[t.category_id]} author={profiles[t.author_id]} lastAuthor={profiles[t.last_reply_author_id]} />
+          ))}
+        </div>
+      )}
+      <LoadMore onClick={more} loading={moreLoading} hasMore={!loading && rows.length < total} />
     </div>
-    {!more && topics.length >= 30 && <div className="mt-5 text-center"><button className="btn btn-secondary" onClick={() => setMore(true)}>Daha çox yüklə</button></div>}
-  </div>;
+  );
 }

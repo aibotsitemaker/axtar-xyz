@@ -1,29 +1,37 @@
-# Test hesabatı
+# TEST_REPORT — v5.0 (forum, Super Admin, hesab tipi)
 
-## Bu dəyişikliklər üzrə nəticə
+Bu hesabat **real icra olunanları** və **icra oluna bilməyənləri** ayrı göstərir.
 
-Bu mühitdə forum, istifadəçi tipləri, admin API və miqrasiya üçün real Supabase giriş məlumatları olmadığından DB inteqrasiyası, iki istifadəçi ilə RLS yoxlaması, e-poçt təsdiqi, Realtime websocket və admin bloklama/silmə real Supabase-də sınanmayıb. Miqrasiya heç bir test və ya production bazasında icra edilməyib.
+## 1. Real PostgreSQL 16 üzərində icra olundu (`tests/pg`, 365 yoxlama, 0 uğursuz)
+Supabase `auth` sxemi minimal təqlid olunub (`tests/pg/00_supabase_stub.sql`); RLS, rollar (`anon`/`authenticated`), `auth.uid()` real Postgres mexanizmləridir. Bu real Supabase deyil, lakin SQL/RLS məntiqini sübut edir.
+- **Forum (əsas test faylı: 329 yoxlama):** qeydiyyatlı istifadəçi mövzu yaradır; ikinci istifadəçi görür və cavab yazır; başqasının mövzu/cavabını dəyişə bilmir; müəllif redaktə/silir (yumşaq silmə); admin istənilən mövzu/cavabı idarə edir; qonaq yaza bilmir; mövzu/cavab/şikayət **rate limit** işləyir; təkrar məzmun, HTML/skript, çox keçid, spam rədd edilir; paralel təkrar klik.
+- **RLS:** bütün `public` cədvəllərində RLS aktiv; `anon` yazma icazəsi yoxdur; forum/admin cədvəllərinə birbaşa yazma yoxdur; daxili funksiyalar bağlıdır; bütün `SECURITY DEFINER` funksiyalarında `search_path` var; qonaq `role`/e-poçt sütunlarını oxuya bilmir.
+- **Admin:** adi istifadəçi admin RPC-lərini çağıra bilmir; özünü admin edə bilmir (`role`, `admin_users`, `set_my_account_type('admin')` bloklanır); bootstrap yalnız təsdiqlənmiş hesab üçün; yeni hesab eyni e-poçtla admin olmur; admin istifadəçi bloklayır/blokdan çıxarır/tip dəyişir/silir; sonuncu Super Admin qorunur; elan, PDF, sınaq idarəsi; audit hər kritik əməliyyatı yazır, dəyişdirilə/silinə bilmir, sirləri təmizləyir.
+- **Qeydiyyat:** tip seçilmədən yaradılma rədd edilir; `teacher`/`student`/`university_student` düzgün saxlanır; `admin` və naməlum dəyər rədd edilir; profil üçün tip birbaşa dəyişdirilə bilmir.
+- **Köhnə baza (`test_legacy.mjs`, 36 yoxlama):** mövcud istifadəçilər/elan/PDF miqrasiyadan sonra salamat; köhnə admin işləyir; 06/07 **iki dəfə** icra olunur; 08 hər halda düzgün; 98 geri qaytarma və yenidən tətbiq işləyir.
 
-- `npm run lint`: 0 xəta, 11 React effect xəbərdarlığı.
-- `npm run build`: uğurlu, TypeScript mərhələsi daxil olmaqla Next.js production build tamamlandı; `/admin` dinamik server marşrutu kimi quruldu.
-- `cd tests/db && npm test`: 75 mövcud SQL testi və 65 forum/admin testi; cəmi 140 keçən test, 0 uğursuz.
-- Lokal browser smoke yoxlaması: `/`, `/auth`, `/forum`, `/books`, `/pdfs`, `/quizzes` `200`; cookie-siz `/admin` `/auth`-a `307` yönləndirir. Qonağın yeni forum mövzusu düyməsi də giriş səhifəsinə yönləndirir.
-- 390×844 mobil viewport-da qeydiyyat forması və üç istifadəçi tipi seçimi vizual yoxlanıb. Bu, Supabase-ə qoşulu cihazlararası test deyil.
-- Lokal browser console-da Supabase URL/anon key çatışmadığına dair xətalar qeydə alınıb; canlı məlumat tələb edən siyahıların nəticələri buna görə təsdiqlənməyib.
-- Paket quraşdırılması zamanı npm audit 7 orta səviyyəli dependency xəbərdarlığı göstərdi. Bu işdə dependency versiyaları dəyişdirilməyib.
+İcra: `PGHOST=... PGPORT=... PGUSER=postgres tests/pg/run_all.sh`.
 
-## Kod səviyyəsində yoxlanılanlar
+## 2. Kod səviyyəsində yoxlandı (stub mühitində)
+- **esbuild ilə hər `app/`, `components/`, `lib/` faylının bundle yoxlaması:** sintaksis, import yolları və adlandırılmış export-lar. Bu yoxlama `ConfirmDialog`, `ListSkeleton`, `LoadMore` komponentlərinin çatışmadığını tapdı; əlavə edildi. İndi 0 xəta.
+- **ESLint (yalnız `no-undef` və əsas düzgünlük qaydaları, müstəqil konfiq):** 0 real xəta (yalnız konfiqin özünə aid 2 xəbərdarlıq).
+- **İkon adları:** bütün istifadə olunan ikonlar `Icons.js`-də var (17 çatışan ikon əlavə edildi).
+- **SSR smoke-render (react-dom/server, Next və Supabase stub):** 21 səhifənin hamısı ilk renderdə xətasız.
+- **Real Chromium-da qeydiyyat testi (Playwright, stub Supabase):** 3 kart var; tip seçilmədən göndərmə `signUp`-ı çağırmır; klaviatura (Space) ilə seçim işləyir; `signUp` metadata-sı `{full_name, account_type:"student"}`; konsol xətası yoxdur.
 
-- Kateqoriya, mövzu, cavab, şikayət, daxili bildiriş, audit log və `platform_admins` cədvəllərinə RLS əlavə olunub.
-- Forum yazılarında müəllif ID-si, mətn uzunluğu, saatlıq limit və təkrar məzmun DB trigger-lərində yoxlanılır.
-- Admin API hər sorğuda access token-i yoxlayıb `platform_admins` ilə tutuşdurur. Service key yalnız server mühitində tələb olunur.
-- Admin icazəsi profil e-poçtuna və ya `profiles.role` sahəsinə əsaslanmır. Admin hesabı təsdiqlənəndən sonra ayrıca SQL ilə reyestrə əlavə edilməlidir.
-- Admin service key verilmədikdə istifadəçi idarəetmə API-si `503` qaytarır; service key brauzerə göndərilmir.
-- `/admin` server layout-u admin sessiya cookie-sini və `platform_admins` reyestrini yoxlayır. Admin qeydlərinin RLS-i və sınaq suallarının yalnız nəticə tarixçəsi olmayan sınaqlarda dəyişdirilməsi PGlite testlərində yoxlanıb.
+## 3. İCRA OLUNA BİLMƏDİ (bu mühitdə)
+Bu mühitdə npm reyestrinə şəbəkə girişi bloklu idi, ona görə Next.js/ESLint/Tailwind quraşdırıla bilmədi. **Aşağıdakıları öz mühitinizdə mütləq icra edin:**
+- `npm ci && npm run lint && npm run build` — **production build keçdi deyə iddia etmirəm**. (Layihədə TypeScript yoxdur, `typecheck` skripti yoxdur.)
+- Real Supabase ilə inteqrasiya (Auth, e-poçt təsdiqi, şifrə bərpası, Realtime, Storage).
+- Tailwind CSS ilə mobil/desktop **vizual** yoxlama və ekran görüntüləri (forum/admin üçün yeni ekran görüntüsü çəkilmədi).
+- Forum/admin səhifələrinin brauzerdə tam axını (yalnız SSR ilk render və qeydiyyat axını yoxlandı).
+- Brauzer konsolu / server log xətaları Next.js işləyərkən.
+- e-poçt bildirişləri (mövcud deyil).
 
-## Məhdudiyyətlər
-
-- Mövzu axtarışı DB-də alt-sətir uyğunluğuna əsaslanır, dilə uyğun leksik full-text indeks deyil. Admin reyestrini idarə etmək üçün UI yoxdur; ilkin Super Admin SQL ilə əlavə olunur.
-- Super Admin təyini e-poçtu təsdiqlənmiş Auth hesabı tələb edir.
-- PGlite testləri real Supabase layihəsini əvəz etmir. İki hesabla Supabase RLS/Realtime, e-poçt və Auth-a qoşulu mobil browser yoxlamaları ayrıca Supabase/Vercel test mühitində aparılmalıdır.
-- `npm run build` admin marşrutunun dinamik/server-render olduğunu göstərir; canlı cookie davranışı real Auth sessiyası ilə ayrıca sınaq tələb edir.
+## 4. Yerləşdirmədən sonra əl ilə yoxlama siyahısı
+1. Test layihədə 06 → 07 icra; mövcud hesabla giriş, elan/PDF/sınaq/çat işləyir.
+2. Yeni qeydiyyat: tip seçilmədən göndərmək olmur; 3 tipin hər biri profildə və forumda rozetlə görünür; e-poçt təsdiqi və şifrə bərpası işləyir.
+3. Köhnə hesab: kabinet → "Hesab tipini seçin" (bir dəfə).
+4. Forum: mövzu yarat → ikinci hesabdan cavab → bildiriş zəngi → şikayət → admin gizlət/sil/bərpa/sabitlə/bağla.
+5. `ADMIN_SETUP.md` üzrə Super Admin; adi hesabla `/admin` "İcazə yoxdur" göstərməlidir.
+6. Brauzer konsolunda (F12) qırmızı xəta yoxdur.
