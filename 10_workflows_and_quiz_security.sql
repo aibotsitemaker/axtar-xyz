@@ -1,4 +1,4 @@
--- Additive V6.1 workflows. Apply after 09_social_trust_views.sql.
+-- Additive V6.2 workflows and legacy-RPC compatibility. Apply after 09_social_trust_views.sql.
 begin;
 
 -- Narrow the legacy v6 grants so users can edit their text without touching counters or authorship.
@@ -202,8 +202,15 @@ begin
 end; $$;
 revoke all on function public.submit_quiz_attempt_once(uuid,jsonb,integer,uuid) from public,anon;
 grant execute on function public.submit_quiz_attempt_once(uuid,jsonb,integer,uuid) to authenticated;
--- The legacy RPC exposed the correct index and explanation after each answer. Retire it.
-revoke all on function public.check_answer(uuid,integer) from public,anon,authenticated;
+-- Older rollback/baseline states may not contain these legacy RPCs. Revoke them
+-- only when present; do not recreate them because the V6 client uses quiz_sessions.
+do $$
+begin
+ if to_regprocedure('public.check_answer(uuid,integer)') is not null then
+  execute 'revoke all on function public.check_answer(uuid,integer) from public,anon,authenticated';
+ end if;
+end;
+$$;
 -- Do not expose correct_index/explanation through PostgREST row selection either.
 revoke select on public.quiz_questions from anon,authenticated;
 grant select(id,quiz_id,position,question_text,options) on public.quiz_questions to anon,authenticated;
@@ -284,7 +291,13 @@ end; $$;
 revoke all on function public.finish_quiz_session(uuid) from public,anon;
 grant execute on function public.finish_quiz_session(uuid) to authenticated;
 revoke all on function public.submit_quiz_attempt_once(uuid,jsonb,integer,uuid) from public,anon,authenticated;
-revoke all on function public.submit_quiz_attempt(uuid,jsonb,integer) from public,anon,authenticated;
+do $$
+begin
+ if to_regprocedure('public.submit_quiz_attempt(uuid,jsonb,integer)') is not null then
+  execute 'revoke all on function public.submit_quiz_attempt(uuid,jsonb,integer) from public,anon,authenticated';
+ end if;
+end;
+$$;
 
 drop function if exists public.admin_v6_analytics();
 create or replace function public.admin_v6_analytics(p_from timestamptz,p_to timestamptz)
