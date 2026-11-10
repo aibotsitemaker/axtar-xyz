@@ -141,4 +141,6 @@ grant update(status) on public.teacher_reviews to authenticated;
 grant update(status,admin_note,reviewed_by,reviewed_at) on public.verification_requests to authenticated;
 grant select on public.feed_posts,public.feed_comments,public.feed_likes,public.teacher_reviews to anon;
 grant usage,select on sequence public.content_views_id_seq to service_role;
+-- PostgREST may not yet know about the newly-created REST objects.
+notify pgrst, 'reload schema';
 commit;

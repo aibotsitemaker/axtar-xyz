@@ -314,6 +314,9 @@ revoke execute on function public.increment_book_view(uuid) from public,anon,aut
 revoke execute on function public.increment_pdf_view(uuid) from public,anon,authenticated;
 
 -- Search RPC only returns public/active content, caps result count, and treats input as plain text.
+-- Drop first so an older function with the same SQL types but different argument names
+-- cannot make CREATE OR REPLACE fail (PostgREST resolves RPC arguments by name).
+drop function if exists public.global_search(text,text);
 create or replace function public.global_search(p_query text,p_kind text default 'all')
 returns table(kind text,id text,title text,excerpt text,href text,created_at timestamptz)
 language plpgsql stable security definer set search_path=public as $$
@@ -337,4 +340,5 @@ end; $$;
 revoke all on function public.global_search(text,text) from public;
 grant execute on function public.global_search(text,text) to anon,authenticated;
 
+notify pgrst, 'reload schema';
 commit;

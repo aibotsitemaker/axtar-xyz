@@ -30,10 +30,21 @@ grant usage on schema public to anon,authenticated,service_role;
 grant select on public.profiles to anon,authenticated;
 grant select on public.pdfs,public.books,public.forum_topics to anon,authenticated;`);
 await db.exec(sql('09_social_trust_views.sql'));
+await db.exec(sql('09_social_trust_views.sql'));
 await db.exec(sql('10_workflows_and_quiz_security.sql'));
 await db.exec(sql('10_workflows_and_quiz_security.sql'));
+// Simulate an older deployed RPC whose PostgreSQL input names differ. CREATE OR REPLACE
+// cannot rename same-typed inputs, so the compatibility migration must drop/recreate it.
+await db.exec(`drop function public.global_search(text,text);
+create function public.global_search(p_kind text,p_query text)
+returns table(kind text,id text,title text,excerpt text,href text,created_at timestamptz)
+language sql stable as $$ select null::text,null::text,null::text,null::text,null::text,null::timestamptz where false $$;`);
+await db.exec(sql('11_supabase_postgrest_compatibility.sql'));
+await db.exec(sql('11_supabase_postgrest_compatibility.sql'));
 const rpc=await db.query("select to_regprocedure('public.submit_quiz_attempt_once(uuid,jsonb,integer,uuid)') as f, to_regprocedure('public.record_content_view(text,text,text,text)') as v");
 if(!rpc.rows[0].f||!rpc.rows[0].v)throw new Error('V6.1 RPC-lər yaradılmadı');
+const searchArgs=await db.query("select proargnames from pg_proc where oid='public.global_search(text,text)'::regprocedure");
+if(searchArgs.rows[0]?.proargnames?.slice(0,2).join(',')!=='p_query,p_kind')throw new Error('global_search PostgREST parametr adları uyğun deyil');
 await db.exec("insert into public.profiles(id,full_name,account_type) values('a0000000-0000-0000-0000-00000000000a','Müəllim','teacher'),('b0000000-0000-0000-0000-00000000000b','Şagird','student'); insert into public.quizzes(id,duration_seconds,is_published) values('c0000000-0000-0000-0000-00000000000c',600,true); insert into public.quiz_questions(id,quiz_id,position,question_text,options,correct_index) values('d0000000-0000-0000-0000-00000000000d','c0000000-0000-0000-0000-00000000000c',1,'Sual','[\"x\",\"y\"]',1);");
 await db.exec("set role authenticated; select set_config('request.jwt.claim.sub','b0000000-0000-0000-0000-00000000000b',false); select set_config('request.jwt.claim.role','authenticated',false);");
 const run=(await db.query("select * from public.start_quiz_session('c0000000-0000-0000-0000-00000000000c')")).rows[0];
@@ -60,7 +71,7 @@ if(limited.rows[0].counted)throw new Error('Guest IP üzrə DB limit aşılır')
 await db.exec("reset role; select set_config('test.admin','true',false); set role authenticated; select set_config('request.jwt.claim.role','authenticated',false);");
 const analytics=await db.query("select public.admin_v6_analytics(now()-interval '7 days',now()) as stats");
 if(!Array.isArray(analytics.rows[0].stats.views_by_day)||analytics.rows[0].stats.views_by_day.length<1)throw new Error('Tarixə görə analitika qrafiki yaranmadı');
-const search=await db.query("select * from public.global_search('Müəllim','all')");
+const search=await db.query("select * from public.global_search(p_query=>'Müəllim',p_kind=>'all')");
 if(!search.rows.some(x=>x.kind==='profile'))throw new Error('Qlobal profil axtarışı işləmədi');
 await db.exec('reset role');
 console.log('PASS  09/10 migrations apply and re-run in isolated PostgreSQL (PGlite) stub');
@@ -68,4 +79,5 @@ console.log('PASS  09/10 migrations apply and re-run in isolated PostgreSQL (PGl
 console.log('PASS  quiz sessions resume, autosave answers and finalize idempotently');
 console.log('PASS  correct answers are hidden, legacy answer RPC is revoked, guest views dedupe and IP throttling is atomic');
 console.log('PASS  admin analytics date filters and global search run on the database');
+console.log('PASS  PostgREST compatibility migration repairs reordered RPC argument names and re-runs safely');
 await db.close();

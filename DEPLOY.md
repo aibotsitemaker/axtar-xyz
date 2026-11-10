@@ -118,6 +118,6 @@ v5.0-dan etibarən admin hüququ `public.admin_users` cədvəlindədir (Auth ID-
 5. Hər yerləşdirmə üçün ayrıca blok istəsəniz: `<AdSlot slot="1234567890" />`.
 
 ## v6 əlavə miqrasiyası
-Hazırkı bazada 06–08 artıq tətbiq edilibsə, əvvəlki ZIP-də 09 icra olunmayıbsa, 09_social_trust_views.sql, sonra 10_workflows_and_quiz_security.sql fayllarını icra edin. 09 artıq işlədilibsə, yalnız 10-u icra edin. Ətraflı: DATABASE_MIGRATIONS.md.
+Hazırkı bazada 06–08 artıq tətbiq edilibsə, 09_social_trust_views.sql, 10_workflows_and_quiz_security.sql və 11_supabase_postgrest_compatibility.sql miqrasiyalarının tətbiq vəziyyətini yoxlayın. Çatışmayanları bu ardıcıllıqla icra edin; 11-ci miqrasiya 09/10 obyektlərinin mövcudluğunu yoxlayır. Ətraflı diaqnostika və Feed/Axtarış düzəlişi üçün DATABASE_MIGRATIONS.md.
 
 Vercel-də `SUPABASE_SERVICE_ROLE_KEY` və `VIEW_SESSION_SECRET` server-only environment variables kimi əlavə edin. `VIEW_SESSION_SECRET` üçün təsadüfi, ən azı 32 simvollu dəyər seçin. Bu dəyişənlərə `NEXT_PUBLIC_` prefiksi verməyin. Layihənin `.env.example` faylında adlar və izah var.

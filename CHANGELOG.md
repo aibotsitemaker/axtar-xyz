@@ -14,3 +14,8 @@
 - Quiz sessiyalarında server deadline, cavab autosave-i və davametmə əlavə edildi.
 - Admin analitikasına 7/30/90 günlük qrafik, Feed populyarlığına qlobal server sıralaması əlavə edildi.
 - Kitab/PDF favoritləri universal yadda saxlanılanlarla sinxronlaşdırıldı; axtarış bütün əsas məzmun növlərini əhatə edir.
+
+## v6.2
+- 09/10 miqrasiyalarında PostgREST schema cache yenilənməsi əlavə edildi.
+- Axtarış RPC-si parametr adı uyğunsuzluğu olan köhnə DB funksiyasından təhlükəsiz şəkildə yenidən yaradılır.
+- Yeni 11-ci uyğunluq miqrasiyası, Supabase REST diaqnostikası və digər modulların schema/RPC auditi əlavə edildi.
