@@ -21,7 +21,7 @@ create table public.favorites(user_id uuid,item_type text,book_id uuid,pdf_id uu
 create table public.forum_topics(id uuid primary key default gen_random_uuid(),author_id uuid,status text default 'active',view_count bigint default 0,title text,body text,excerpt text,last_activity_at timestamptz default now(),created_at timestamptz default now());
 create table public.forum_replies(id uuid primary key default gen_random_uuid(),topic_id uuid references public.forum_topics(id),author_id uuid,body text,status text default 'active',created_at timestamptz default now());
 create table public.notifications(id uuid primary key default gen_random_uuid(),user_id uuid,actor_id uuid,type text check(type in ('forum_reply','forum_reply_to_reply','moderation')),title text,body text,link text,is_read boolean default false,created_at timestamptz default now());
-create table public.quizzes(id uuid primary key default gen_random_uuid(),duration_seconds int,is_published boolean);
+create table public.quizzes(id uuid primary key default gen_random_uuid(),created_by uuid,title text,description text,category text,duration_seconds int,is_published boolean);
 create table public.quiz_questions(id uuid primary key default gen_random_uuid(),quiz_id uuid references public.quizzes(id),position int,question_text text,options jsonb,correct_index int,explanation text);
 create table public.quiz_attempts(id uuid primary key default gen_random_uuid(),quiz_id uuid,user_id uuid,correct_count int,total_questions int,score_percent numeric,seconds_used int,answers jsonb,created_at timestamptz default now());
 create function public.check_answer(uuid,integer) returns table(r_correct boolean,r_index integer,r_explanation text) language sql as $$ select false,0,''::text $$;
@@ -47,6 +47,8 @@ await db.exec(sql('11_supabase_postgrest_compatibility.sql'));
 await db.exec(sql('11_supabase_postgrest_compatibility.sql'));
 await db.exec(sql('12_platform_completion.sql'));
 await db.exec(sql('12_platform_completion.sql'));
+await db.exec(sql('13_quiz_question_types.sql'));
+await db.exec(sql('13_quiz_question_types.sql'));
 const rpc=await db.query("select to_regprocedure('public.submit_quiz_attempt_once(uuid,jsonb,integer,uuid)') as f, to_regprocedure('public.record_content_view(text,text,text,text)') as v");
 if(!rpc.rows[0].f||!rpc.rows[0].v)throw new Error('V6 RPC-lər yaradılmadı');
 const searchArgs=await db.query("select proargnames from pg_proc where oid='public.global_search(text,text)'::regprocedure");
@@ -65,7 +67,27 @@ if(review.correct_index!==1||review.picked_index!==1||!review.is_correct)throw n
 let answerColumnDenied=false;try{await db.query('select correct_index from public.quiz_questions');}catch(e){answerColumnDenied=e.code==='42501';}
 if(!answerColumnDenied)throw new Error('correct_index sütunu API-dən hələ də oxunur');
 const safeColumns=await db.query('select question_text,options from public.quiz_questions');
+
 if(safeColumns.rows.length!==1)throw new Error('Təhlükəsiz test sütunları oxunmur');
+await db.exec("select set_config('request.jwt.claim.sub','a0000000-0000-0000-0000-00000000000a',false)");
+const typedQuiz=(await db.query("select public.teacher_create_quiz('Növlü sınaq','Yoxlama','DİM',600,$1::jsonb) as id",[JSON.stringify([
+ {type:'multiple',text:'İki variant seçin',options:['A','B','C'],correct_answers:[0,2],points:2},
+ {type:'text',text:'Mətn cavabı',accepted_answers:['Bakı'],options:[],points:1},
+ {type:'numeric',text:'Hesablayın',options:[],correct_numeric:42,numeric_tolerance:0.5,points:3}
+])])).rows[0].id;
+const tq=await db.query('select id,question_type from public.quiz_questions where quiz_id=$1 order by position',[typedQuiz]);
+if(tq.rows.length!==3||tq.rows[0].question_type!=='multiple')throw new Error('Yeni sual növləri yaradılmadı');
+await db.query('select public.teacher_publish_quiz($1,true)',[typedQuiz]);
+const typedRun=(await db.query('select * from public.start_quiz_session($1)',[typedQuiz])).rows[0];
+for(const [i,a] of [[0,[0,2]],[1,'bAKi'],[2,42.3]]) await db.query('select public.save_quiz_session_answer_v2($1,$2,$3::jsonb)',[typedRun.session_id,tq.rows[i].id,JSON.stringify(a)]);
+const typedResult=(await db.query('select * from public.finish_quiz_session_v2($1)',[typedRun.session_id])).rows[0];
+if(typedResult.r_correct!==3||Number(typedResult.r_earned_points)!==6||Number(typedResult.r_percent)!==100)throw new Error('Yeni sual növlərinin server qiymətləndirilməsi/bal hesabı yanlışdır');
+const typedReview=await db.query('select * from public.quiz_session_review_v2($1)',[typedRun.session_id]);
+if(typedReview.rows.length!==3||typedReview.rows.some(x=>!x.is_correct))throw new Error('Yeni sual növləri üzrə təhlil səhvdir');
+await db.query('select public.teacher_publish_quiz($1,true)',[typedQuiz]);
+// SECURITY DEFINER publish RPC succeeded without granting direct table writes.
+await db.exec("select set_config('request.jwt.claim.sub','b0000000-0000-0000-0000-00000000000b',false)");
+
 await db.exec("reset role; set role anon; select set_config('request.jwt.claim.role','anon',false);");
 let legacyRpcDenied=false;try{await db.query("select * from public.check_answer('d0000000-0000-0000-0000-00000000000d',1)");}catch(e){legacyRpcDenied=e.code==='42501'||e.code==='42883';}
 if(!legacyRpcDenied|| (await db.query("select to_regprocedure('public.check_answer(uuid,integer)') as f")).rows[0].f)throw new Error('Köhnə check_answer RPC açıqdır və ya təhlükəsiz şəkildə yoxlanmadı');
@@ -104,11 +126,12 @@ const nextRun=(await db.query("select * from public.start_quiz_session('c0000000
 const expired=await db.query("select status,attempt_id from public.quiz_sessions where id=$1",[stale.session_id]);
 if(!nextRun.session_id||expired.rows[0].status!=='expired'||!expired.rows[0].attempt_id)throw new Error('Müddəti bitmiş sessiya nəticəsiz itdi');
 await db.exec('reset role');
-console.log('PASS  09/10 migrations apply and re-run in isolated PostgreSQL (PGlite) stub');
+console.log('PASS  09–13 migrations apply and re-run in isolated PostgreSQL (PGlite) stub');
  console.log('PASS  quiz answers are scored server-side and session finalization is idempotent');
 console.log('PASS  quiz sessions resume, autosave answers and finalize idempotently');
 console.log('PASS  correct answers are hidden, legacy answer RPC is revoked, guest views dedupe and IP throttling is atomic');
 console.log('PASS  admin analytics date filters and global search run on the database');
 console.log('PASS  PostgREST compatibility migration repairs reordered RPC argument names and re-runs safely');
 console.log('PASS  quiz review reveals answers only after submit; expired sessions are finalized; profile stats, mention notifications and Feed report moderation work');
+console.log('PASS  quiz question types, weighted scoring, review and teacher create/publish RPCs work');
 await db.close();

@@ -26,3 +26,9 @@
 - Admin Feed şikayətlərini həll edib qərarı audit jurnalına yaza bilər.
 - Sınaqda sual gəzişi, cavabı dəyişmə, oflayn müvəqqəti saxlanma və təqdimatdan sonra izahlı cavab təhlili əlavə edildi.
 - `12_platform_completion.sql` əlavə olundu; `is_verified` API icazəsi və qeyd edilən yeni imkanların RPC/RLS dəstəyi düzəldildi.
+
+## v6.4
+- Sınaqlar beş sual növünü (tək seçim, çoxseçim, doğru/yanlış, mətn, rəqəm/riyaziyyat) və sual başına bal çəkisini dəstəkləyir.
+- Server cavabları təhlükəsiz JSON RPC ilə saxlayır, tolerantlıqlı mətn/rəqəm müqayisəsi aparır, balları hesablayır; cavab açarları REST-dən bağlı qalır.
+- Müəllim sınaq yarada, qaralama kimi saxlaya, dərc və dərcdən çıxara bilir; RLS və RPC sahiblik yoxlaması əlavə edildi.
+- Yeni additive `13_quiz_question_types.sql`; köhnə sessiya/RPC interfeysləri və mövcud sınaq cəhdləri saxlanıldı.

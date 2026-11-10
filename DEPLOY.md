@@ -1,5 +1,7 @@
 # TəhsilHub v5.0 — Forum, Super Admin və hesab tipi: yerləşdirmə təlimatı
 
+> Mövcud layihəni v6.4-ə yüksəldirsinizsə, həmin v5 quraşdırma addımlarını təkrarlamayın. Əlavə v6.4 bazası yeniləməsi üçün `DATABASE_MIGRATIONS.md` sənədindəki 13-cü migration təlimatına baxın.
+
 > Bu bölmə v5.0 üçündür (forum, admin paneli, qeydiyyatda müəllim/şagird/tələbə). Aşağıdakı v4.0 təlimatı (1–9) əsas quraşdırma üçün qüvvədə qalır.
 > **Heç bir SQL avtomatik işləmir və mən real production bazasına toxunmadım.** Hər şeyi əvvəlcə test layihəsində yoxlayın.
 

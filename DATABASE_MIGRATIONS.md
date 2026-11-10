@@ -33,3 +33,9 @@ Mövcud DB-də növbəti buraxılış üçün:
 - 09, 10 və 11 tətbiq olunmayıbsa, onları həmin ardıcıllıqla tətbiq edin, sonra 12-ni işlədin.
 - 09–11 tətbiq olunubsa, yalnız 12-ni işlədin.
 - 06–08-i mövcud bazada təkrar işlətməyin. Bu iş zamanı canlı Supabase DB-yə qoşulub heç bir dəyişiklik edilməyib.
+
+## v6.4 — sınaq sual növləri və müəllim sınaqları
+
+v6.3 verilənlər bazasına yeniləmə üçün 09–12 artıq tətbiq olunubsa, yalnız `13_quiz_question_types.sql` faylını Supabase SQL Editor-də bir dəfə işlədin. Bu additive miqrasiya mövcud quiz suallarına köhnə davranışla uyğun `single` tipi və əvvəlki `correct_index`-dən cavab dəsti əlavə edir; cəhdlər, cavablar və nəticə tarixçəsi silinmir. 06–08-ə toxunmur.
+
+13-cü fayl beş sual tipini, bal çəkisini, təhlükəsiz JSON cavab saxlama RPC-sini, serverdə yekun qiymətləndirməni, yekundan sonrakı təhlili və müəllimin öz testini yaratma/yayımlama RPC-lərini əlavə edir. Sual cavab açar sütunları API oxu icazəsindən kənarda qalır. Funksiyalar PostgREST schema cache-i `NOTIFY pgrst, 'reload schema'` ilə yeniləyir. Tətbiqdən əvvəl backup alın; miqrasiya PGlite izolyasiya testində iki dəfə tətbiq edilərək yoxlanıb, lakin canlı layihədə hələ işlədilməyib.

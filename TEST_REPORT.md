@@ -1,4 +1,6 @@
-# TEST_REPORT — TəhsilHub v6.3
+# TEST_REPORT — TəhsilHub v6.4
+
+Bu hesabat v6.3 tarixçəsini də saxlayır; bu ZIP üçün ən son yoxlama və dəyişikliklər aşağıdakı v6.4 bölməsindədir.
 
 ## Supabase schema cache audit (v6.2 düzəlişi)
 
@@ -55,4 +57,14 @@
 - `npm run build -- --webpack` standart mənbə `next.config.js` konfiqurasiyası ilə uğurla tamamlandı: webpack kompilyasiyası, TypeScript yoxlaması, 33/33 static page prerender, optimizasiya və build trace keçdi. `next.config.js`-ə build üçün daimi workaround əlavə edilməyib.
 - EPERM-in kök səbəbi Codex-in məhdud sandbox icra rejimində Next.js-in build child process-lərinin çıxış qovluqlarında yeni qovluq yarada bilməməsi idi. Həmin rejimdə Windows ACL istifadəçiyə `FullControl` versə və əsas Node prosesi `mkdir` edə bilsə də, Next build worker-ləri EPERM alırdı. Bu yoxlama üçün Full access müvəqqəti aktivləşdiriləndən sonra eyni layihə, standart konfiqurasiya və production build tam keçdi. Deməli xəta tətbiq kodunda deyildi; full access-i sonradan əvvəlki sandbox rejiminə qaytarmaq olar.
 - Testlər PGlite izolyasiya mühitində işləyir. Canlı Supabase cədvəl/RLS/storage davranışı, e-poçt və real brauzer/mobil cihazlar yoxlanmayıb; miqrasiya canlı layihədə icra edilməyib.
+
+## v6.4 — yekun iş və yoxlama (2026-11-10)
+
+- Sınaq sistemi auditi əvvəlki modelin yalnız `correct_index` ilə tək seçim qiymətləndirdiyini aşkar etdi. Additive `13_quiz_question_types.sql` legacy sınaq suallarını `single` kimi saxlayır və `multiple`, `boolean`, `text`, `numeric` növlərini əlavə edir. Hər sualın çəkili balı 0–100 aralığında saxlanır.
+- Serverdə JSON cavab autosave, deadline/sessiya sahibi yoxlama, tam çoxseçimli uyğunluq, normalizasiya edilmiş mətn müqayisəsi, numeric tolerance, çəkili faiz balı və yekundan sonrakı sual təhlili əlavə olundu. Correct answer columns PostgREST-dən bağlı qalır. Köhnə RPC-lər legacy uyğunluq üçün saxlanılıb.
+- Admin sınaq forması bütün beş növü qəbul edir. Müəllimlərdə **Sınaqlarımı idarə et** bölməsi, draft yaradıcılığı, dərc/dərcdən çıxarma, RLS sahibi yoxlaması və audit log əlavə olundu.
+- `tests/db/test_v6_migrations.mjs`: 09–13 miqrasiyalarını təkrar tətbiq etmə, köhnə sessiyanın idempotency-si, cavab açarı grant-ları, yeni sual növlərinin server hesablaması/balları/təhlili və müəllim create/publish axını keçdi. Bütün DB test komandası uğurla başa çatdı: 75 sxem yoxlaması + 42 yeni layihə yoxlaması + V6 migration ssenariləri.
+- `npm run lint -- --quiet` uğurla keçdi. `npm run build -- --webpack` uğurla keçdi: compile, TypeScript və 34/34 static page prerender.
+- 06–08 faylları və mövcud məlumatlar dəyişdirilməyib; canlı Supabase bazasına miqrasiya tətbiq olunmayıb. Mövcud v6.3 bazasında deploy etməzdən əvvəl ehtiyat nüsxə alın və yalnız 13-cü SQL faylını icra edin.
+- Canlı Supabase, həqiqi istifadəçi hesabları ilə müəllim rol axını, brauzer cihazları, mail və storage bu mühitdən sınaqdan keçirilməyib. Full access build yoxlaması üçün müvəqqəti açılmışdı; iş bitəndən sonra istifadəçinin əvvəlki sandbox ayarını bərpa etməsi tövsiyə olunur.
 

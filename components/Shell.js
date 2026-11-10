@@ -123,6 +123,7 @@ export default function Shell({ children }) {
                       <p className="truncate text-xs text-muted">{user.email}</p>
                     </div>
                     {me.isAdmin && <Link role="menuitem" href="/admin" className="mt-1 flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-primary hover:bg-primary-soft"><Icon name="shield" className="h-4 w-4" />Admin paneli</Link>}
+                    {(me.accountType === 'teacher' || me.isAdmin) && <Link role="menuitem" href="/teacher/quizzes" className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm hover:bg-canvas"><Icon name="quiz" className="h-4 w-4 text-muted" />Sınaqlarımı idarə et</Link>}
                     <Link role="menuitem" href="/profile" className="mt-1 flex items-center gap-2 rounded-lg px-3 py-2 text-sm hover:bg-canvas"><Icon name="user" className="h-4 w-4 text-muted" />Kabinet</Link>
                     <Link role="menuitem" href="/notifications" className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm hover:bg-canvas"><Icon name="bell" className="h-4 w-4 text-muted" />Bildirişlər{notif > 0 ? ` (${notif})` : ''}</Link>
                     <Link role="menuitem" href="/chat" className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm hover:bg-canvas"><Icon name="chat" className="h-4 w-4 text-muted" />Mesajlar{unread > 0 ? ` (${unread})` : ''}</Link>
@@ -162,6 +163,7 @@ export default function Shell({ children }) {
                 ) : (
                   <>
                     {me.isAdmin && <Link href="/admin" className="btn btn-primary"><Icon name="shield" className="h-4 w-4" />Admin paneli</Link>}
+                    {(me.accountType === 'teacher' || me.isAdmin) && <Link href="/teacher/quizzes" className="btn btn-secondary"><Icon name="quiz" className="h-4 w-4" />Sınaqlarımı idarə et</Link>}
                     <Link href="/notifications" className="btn btn-secondary"><Icon name="bell" className="h-4 w-4" />Bildirişlər{notif > 0 ? ` (${notif})` : ''}</Link>
                     <Link href="/profile" className="btn btn-secondary"><Icon name="user" className="h-4 w-4" />Kabinet</Link>
                     <button onClick={logout} className="btn btn-danger"><Icon name="logout" className="h-4 w-4" />Çıxış</button>

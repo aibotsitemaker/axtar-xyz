@@ -13,7 +13,7 @@ import { errText, fmtDate } from '../../../lib/format';
 const CATS = ['DİM', 'Magistr', 'IELTS', 'Universitet', 'Digər'];
 const STATUSES = [['', 'Hamısı'], ['published', 'Dərc olunub'], ['draft', 'Qaralama']];
 const MAX_Q = 50;
-const blankQ = () => ({ text: '', options: ['', ''], correct: 0, explanation: '' });
+const blankQ = () => ({ text: '', type: 'single', options: ['', ''], correct: 0, correctMany: [0], answerText: '', answerNumber: '', tolerance: '0', points: '1', explanation: '' });
 const minutes = (s) => (s % 60 === 0 ? `${s / 60} dəq.` : `${Math.floor(s / 60)} dəq. ${s % 60} san.`);
 
 // İstemci tərəfi yoxlama (server admin_create_quiz() həmin qaydaları təkrar yoxlayır).
@@ -26,15 +26,20 @@ function validate(title, mins, questions) {
     const q = questions[i];
     const t = q.text.trim();
     if (t.length < 3 || t.length > 500) return `${i + 1}-ci sual: mətn 3–500 simvol olmalıdır.`;
+    if (!['single','multiple','boolean','text','numeric'].includes(q.type)) return `${i + 1}-ci sual: sual növü yanlışdır.`;
     const opts = q.options.map((o) => o.trim());
-    if (opts.length < 2 || opts.length > 6 || opts.some((o) => o.length < 1 || o.length > 300)) return `${i + 1}-ci sual: 2–6 variant olmalıdır (hər biri 1–300 simvol, boş olmaz).`;
-    if (q.correct < 0 || q.correct >= opts.length) return `${i + 1}-ci sual: düzgün cavabı seçin.`;
+    if (['single','multiple','boolean'].includes(q.type) && (opts.length < 2 || opts.length > 6 || opts.some((o) => o.length < 1 || o.length > 300))) return `${i + 1}-ci sual: 2–6 variant olmalıdır (hər biri 1–300 simvol, boş olmaz).`;
+    if (q.type === 'single' && (q.correct < 0 || q.correct >= opts.length)) return `${i + 1}-ci sual: düzgün cavabı seçin.`;
+    if (q.type === 'multiple' && (!q.correctMany.length || q.correctMany.some((v) => v < 0 || v >= opts.length))) return `${i + 1}-ci sual: ən azı bir düzgün variant seçin.`;
+    if (q.type === 'text' && !q.answerText.trim()) return `${i + 1}-ci sual: düzgün mətn cavabını yazın.`;
+    if (q.type === 'numeric' && !Number.isFinite(Number(q.answerNumber))) return `${i + 1}-ci sual: düzgün rəqəm cavabını yazın.`;
+    if (!Number.isFinite(Number(q.points)) || Number(q.points) <= 0 || Number(q.points) > 100) return `${i + 1}-ci sual: bal 0-dan böyük, ən çox 100 olmalıdır.`;
     if (q.explanation.trim().length > 500) return `${i + 1}-ci sual: izah 500 simvoldan çox ola bilməz.`;
   }
   return '';
 }
 
-function CreateForm({ onClose, onCreated }) {
+export function CreateForm({ onClose, onCreated }) {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [category, setCategory] = useState(CATS[0]);
@@ -63,14 +68,14 @@ function CreateForm({ onClose, onCreated }) {
     lock.current = true;
     setBusy(true);
     setErr('');
-    const { error } = await supabase.rpc('admin_create_quiz', {
+    const { error } = await supabase.rpc('teacher_create_quiz', {
       p_title: title.trim(), p_description: description.trim() || null, p_category: category, p_duration: Math.round(Number(mins) * 60),
-      p_questions: qs.map((q) => ({ text: q.text.trim(), options: q.options.map((o) => o.trim()), correct_index: q.correct, explanation: q.explanation.trim() || null }))
+      p_questions: qs.map((q) => ({ type: q.type, text: q.text.trim(), options: q.type === 'boolean' ? ['Doğru','Yanlış'] : q.options.map((o) => o.trim()), correct_index: q.correct, correct_answers: q.type === 'multiple' ? q.correctMany : q.type === 'single' ? [q.correct] : q.type === 'boolean' ? [q.correct] : undefined, accepted_answers: q.type === 'text' ? [q.answerText.trim()] : undefined, correct_numeric: q.type === 'numeric' ? Number(q.answerNumber) : undefined, numeric_tolerance: q.type === 'numeric' ? Number(q.tolerance || 0) : undefined, points: Number(q.points), explanation: q.explanation.trim() || null }))
     });
     setBusy(false);
     lock.current = false;
     if (error) { setErr(errText(error)); return; }
-    onCreated('Sınaq qaralama kimi yaradıldı. İstifadəçilərə göstərmək üçün «Dərc et» düyməsini basın.');
+    onCreated('Sınaq qaralama kimi yaradıldı. Müəllim sınaqlarında onu ayrıca dərc edin.');
   }
 
   return (
@@ -104,20 +109,24 @@ function CreateForm({ onClose, onCreated }) {
         {qs.map((q, i) => (
           <fieldset key={i} className="rounded-xl border border-line p-4">
             <legend className="px-1 text-sm font-semibold">{i + 1}-ci sual</legend>
+            <label className="label">Sual növü<select className="input" value={q.type} onChange={e=>setQ(i,{type:e.target.value,options:e.target.value==='boolean'?['Doğru','Yanlış']:q.options})}><option value="single">Bir düzgün cavab</option><option value="multiple">Bir neçə düzgün cavab</option><option value="boolean">Doğru / yanlış</option><option value="text">Qısa mətn</option><option value="numeric">Rəqəm / riyaziyyat</option></select></label>
             <div>
               <label htmlFor={`q-${i}-text`} className="label">Sual mətni</label>
               <textarea id={`q-${i}-text`} rows={2} maxLength={500} className="input" value={q.text} onChange={(e) => setQ(i, { text: e.target.value })} />
             </div>
-            <div className="mt-3 space-y-2" role="radiogroup" aria-label={`${i + 1}-ci sualın variantları; düzgün cavabı seçin`}>
+            {['single','multiple','boolean'].includes(q.type) && <div className="mt-3 space-y-2" role={q.type==='multiple'?'group':'radiogroup'} aria-label={`${i + 1}-ci sualın variantları; düzgün cavabı seçin`}>
               {q.options.map((o, j) => (
                 <div key={j} className="flex items-center gap-2">
-                  <input type="radio" name={`q-${i}-correct`} checked={q.correct === j} onChange={() => setQ(i, { correct: j })}
+                  <input type={q.type==='multiple'?'checkbox':'radio'} name={`q-${i}-correct`} checked={q.type==='multiple'?q.correctMany.includes(j):q.correct === j} onChange={() => setQ(i, q.type==='multiple'?{correctMany:q.correctMany.includes(j)?q.correctMany.filter(v=>v!==j):[...q.correctMany,j]}:{ correct: j })}
                     aria-label={`${j + 1}-ci variant düzgün cavabdır`} className="h-4 w-4 shrink-0 accent-primary" />
                   <input className="input" maxLength={300} aria-label={`${i + 1}-ci sual, ${j + 1}-ci variant`} placeholder={`Variant ${j + 1}`} value={o} onChange={(e) => setOpt(i, j, e.target.value)} />
                   <button type="button" className="btn btn-ghost btn-sm shrink-0" disabled={q.options.length <= 2} onClick={() => delOpt(i, j)} aria-label={`${j + 1}-ci variantı sil`}><Icon name="x" className="h-4 w-4" /></button>
                 </div>
               ))}
-            </div>
+            </div>}
+            {q.type==='text' && <label className="label mt-3">Qəbul edilən cavab<input className="input" maxLength={1000} value={q.answerText} onChange={e=>setQ(i,{answerText:e.target.value})}/></label>}
+            {q.type==='numeric' && <div className="mt-3 grid gap-3 sm:grid-cols-3"><label className="label">Düzgün cavab<input type="number" step="any" className="input" value={q.answerNumber} onChange={e=>setQ(i,{answerNumber:e.target.value})}/></label><label className="label">Yolverilən xəta<input type="number" min="0" step="any" className="input" value={q.tolerance} onChange={e=>setQ(i,{tolerance:e.target.value})}/></label></div>}
+            <label className="label mt-3">Bal<input type="number" min="0.01" max="100" step="0.25" className="input w-32" value={q.points} onChange={e=>setQ(i,{points:e.target.value})}/></label>
             <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
               <button type="button" className="btn btn-secondary btn-sm" disabled={q.options.length >= 6} onClick={() => addOpt(i)}><Icon name="plus" className="h-4 w-4" />Variant əlavə et</button>
               {qs.length > 1 && <button type="button" className="btn btn-danger btn-sm" onClick={() => setQs((a) => a.filter((_, k) => k !== i))}><Icon name="trash" className="h-4 w-4" />Sualı sil</button>}
