@@ -1,4 +1,4 @@
-# TEST_REPORT — TəhsilHub v6.7
+# TEST_REPORT — TəhsilHub v6.8
 
 Bu hesabat v6.3–v6.5 yoxlama tarixçəsini saxlayır; cari dizayn buraxılışı və son yoxlamalar v6.6 bölməsindədir.
 
@@ -97,3 +97,14 @@ Final dizayn kodundan sonra `npm run lint -- --quiet` və `npm run build -- --we
 - `npm run lint -- --quiet` və DB suite keçdi: 75 sxem yoxlaması, 42 layihə yoxlaması, V6.2–V6.7 ssenariləri və avatar/media imza sınaqları. Production build son UI versiyasından sonra ayrıca keçirilir.
 - Brauzer screenshot və fiziki mobil test bu mühitdə browser istifadəsi bağlı olduğuna görə aparılmayıb; responsive breakpoint və DOM/CSS build səviyyəsində yoxlanıb. Canlı Supabase miqrasiyası icra edilməyib.
 Son yekun production build: `npm run build -- --webpack` uğurla keçdi; TypeScript yoxlaması, build trace və 37/37 statik səhifə tamamlandı.
+
+## v6.8 — profil, sınaq təsdiqi və verified hesab axınları
+
+- Yeni `15_social_profiles_moderation_verification.sql` migration-ı 14-cü migration-dan sonra əlavə edildi. Əvvəlki migration faylları dəyişdirilmədi. `profiles.cover_url` və `profile-covers` Storage bucket/policy-ləri, quiz statusları və admin RPC-ləri, doğrulama admin RPC-ləri əlavə olundu.
+- Profil API-si sessiyanı Supabase Auth ilə yoxlayır, fayl imzasını JPEG/PNG/WebP allowlist-i ilə yoxlayır, cover üçün 5 MB limit tətbiq edir, UUID fayl adı istifadə edir və avatarla ortaq saatlıq DB rate limitindən keçir. Cover dəyişmə/silmə zamanı əvvəlki sahib faylı təmizlənir; hesab silinməsində cover faylları da təmizlənir.
+- İctimai və şəxsi profil header-ləri cover → avatar → ad/verified badge → məlumat/statistika ardıcıllığına keçirildi. Mobil görünüş üçün responsive Tailwind ölçüləri tətbiq olundu.
+- Müəllimin quiz yaratması `pending` statusu ilə başlayır. Müəllimin publish RPC çağırışı yalnız təsdiq növbəsinə göndərir; RLS və cədvəl grant-ları digər istifadəçinin pending sınağını görə bilməsinə və birbaşa yayımlamasına imkan vermir. Admin səhifəsi bütün sual və cavabları RPC vasitəsilə göstərir, təsdiq/rədd/qaralama/silmə əməliyyatları audit yazır. Mövcud yayımlanmış/qaralama quiz-lərin statusu backfill olunur.
+- Verified müraciət qərarları cədvəldə birbaşa update grant-ı olmadan `assert_admin()` RPC-dən keçir. Adi istifadəçi statusu dəyişə bilmir; admin müraciəti təsdiqləyə/rədd edə, mavi tıkı birbaşa verə/götürə və siyahıları görə bilir. Bütün qərarlar audit log-a yazılır.
+- `npm test --prefix tests/db` uğurla keçdi: 75 schema/security testi, 42 loyiha və workflow yoxlaması. PGlite-də 09–15 migration-lar iki dəfə tətbiq olundu. Yeni assertions quiz pending → admin published axınını, doğrulama statusunun adi istifadəçi update-i ilə dəyişmədiyini, müraciət təsdiqini və birbaşa verified grant-ı yoxladı.
+- `npm run lint -- --quiet` uğurla keçdi. `npm run build -- --webpack` uğurla keçdi; 39/39 statik səhifə yaradıldı, `/admin/quizzes` və `/api/profile-cover` build nəticəsində mövcuddur.
+- Browser screenshot və real Supabase layihəsində axın sınağı bu mühitdə mümkün olmadı (browser səthi və Supabase credentials qoşulu deyil). DB təhlükəsizlik davranışı PGlite-də, frontend route/build/Lint isə lokal layihədə yoxlanıb. Canlı DB-yə heç bir SQL tətbiq edilməyib; deploydan əvvəl backup alıb yalnız migration 15-i icra edin.

@@ -46,3 +46,14 @@ v6.3 verilənlər bazasına yeniləmə üçün 09–12 artıq tətbiq olunubsa, 
 09–13 artıq tətbiq edilmiş v6.6 DB-si üçün backup aldıqdan sonra `14_social_features.sql` faylını Supabase SQL Editor-də icra edin. Fayl mövcud postları dəyişmədən `feed_posts.post_type/media_urls`, poll seçim/səs cədvəlləri, şəxsi müəllim izləmələri, təhsil layihələri, saved project dəstəyi və `feed-media` Storage bucket/policy-lərini əlavə edir. Həmçinin media yükləmə saatlıq limiti və server-side Feed post/poll RPC-ləri yaradır.
 
 Yeni quraşdırmada ardıcıllıq 01–08 (mövcud layihə qaydasına uyğun), 09, 10, 11, 12, 13, 14-dür. 06–08-i mövcud DB-də təkrar işlətməyin. 14-cü migration PGlite izolyasiya testində iki dəfə tətbiq edilərək yoxlanıb, canlı DB-də icra edilməyib.
+
+## v6.8 — sosial profil, sınaq təsdiqi və mavi tık
+
+v6.7 bazası üçün backup aldıqdan sonra yalnız `15_social_profiles_moderation_verification.sql` faylını Supabase SQL Editor-də icra edin. Bu migration əvvəlki 00–14 fayllarını dəyişmir.
+
+- Profilə `cover_url` əlavə edir, sahibin UID qovluğuna yazma/silmə icazəli `profile-covers` Storage bucket-i yaradır. Tətbiq API-si bearer sessiyasını təsdiqləyir, 5 MB limiti və JPEG/PNG/WebP fayl imzasını yoxlayır; şəkil yükləmə limiti avatarla ortaqdır.
+- Mövcud `is_published=true` sınaqları `published`, mövcud dərc olunmamış sınaqları `draft` kimi saxlayır. Müəllimin yeni sınağı `pending` olur; müəllimin dərc RPC-si yalnız təsdiqə göndərir və admin olmayan şəxs onu yayımlaya bilməz.
+- Admin sınaq yoxlama RPC-si cavab açarları daxil olmaqla bütün sual məlumatını adminə verir. Təsdiq, rədd, silmə, doğrulama qərarı və birbaşa mavi tık vermə/ləğv etmə əməliyyatları audit jurnalına yazılır.
+- Doğrulama cədvəlində adi istifadəçinin status yeniləmə icazəsi ləğv olunur. Müraciət yaratmaq və öz müraciətini oxumaq əvvəlki kimi qalır.
+
+Yeni quraşdırmada sıra 01–08 (mövcud deploy təlimatına uyğun), 09, 10, 11, 12, 13, 14, 15-dir. Mövcud DB-də 00–14 artıq tətbiq olunubsa, yalnız 15-i işlədin. 06–08-i yenidən icra etməyin. Migration 15 PGlite PostgreSQL mühitində iki dəfə tətbiq etmə, quiz təsdiq axını və doğrulama icazələri ilə yoxlanıb; canlı Supabase DB-də icra edilməyib.

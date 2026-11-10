@@ -21,7 +21,7 @@ create table public.favorites(user_id uuid,item_type text,book_id uuid,pdf_id uu
 create table public.forum_topics(id uuid primary key default gen_random_uuid(),author_id uuid,status text default 'active',view_count bigint default 0,title text,body text,excerpt text,last_activity_at timestamptz default now(),created_at timestamptz default now());
 create table public.forum_replies(id uuid primary key default gen_random_uuid(),topic_id uuid references public.forum_topics(id),author_id uuid,body text,status text default 'active',created_at timestamptz default now());
 create table public.notifications(id uuid primary key default gen_random_uuid(),user_id uuid,actor_id uuid,type text check(type in ('forum_reply','forum_reply_to_reply','moderation')),title text,body text,link text,is_read boolean default false,created_at timestamptz default now());
-create table public.quizzes(id uuid primary key default gen_random_uuid(),created_by uuid,title text,description text,category text,duration_seconds int,is_published boolean);
+create table public.quizzes(id uuid primary key default gen_random_uuid(),created_by uuid,title text,description text,category text,duration_seconds int,is_published boolean,created_at timestamptz default now());
 create table public.quiz_questions(id uuid primary key default gen_random_uuid(),quiz_id uuid references public.quizzes(id),position int,question_text text,options jsonb,correct_index int,explanation text);
 create table public.quiz_attempts(id uuid primary key default gen_random_uuid(),quiz_id uuid,user_id uuid,correct_count int,total_questions int,score_percent numeric,seconds_used int,answers jsonb,created_at timestamptz default now());
 create function public.check_answer(uuid,integer) returns table(r_correct boolean,r_index integer,r_explanation text) language sql as $$ select false,0,''::text $$;
@@ -55,6 +55,8 @@ create table storage.objects(bucket_id text,name text);
 create function storage.foldername(text) returns text[] language sql immutable as $$ select string_to_array($1,'/') $$;`);
 await db.exec(sql('14_social_features.sql'));
 await db.exec(sql('14_social_features.sql'));
+await db.exec(sql('15_social_profiles_moderation_verification.sql'));
+await db.exec(sql('15_social_profiles_moderation_verification.sql'));
 const rpc=await db.query("select to_regprocedure('public.submit_quiz_attempt_once(uuid,jsonb,integer,uuid)') as f, to_regprocedure('public.record_content_view(text,text,text,text)') as v");
 if(!rpc.rows[0].f||!rpc.rows[0].v)throw new Error('V6 RPC-lər yaradılmadı');
 const searchArgs=await db.query("select proargnames from pg_proc where oid='public.global_search(text,text)'::regprocedure");
@@ -120,6 +122,24 @@ const typedQuiz=(await db.query("select public.teacher_create_quiz('Növlü sın
 const tq=await db.query('select id,question_type from public.quiz_questions where quiz_id=$1 order by position',[typedQuiz]);
 if(tq.rows.length!==3||tq.rows[0].question_type!=='multiple')throw new Error('Yeni sual növləri yaradılmadı');
 await db.query('select public.teacher_publish_quiz($1,true)',[typedQuiz]);
+const unapproved=(await db.query('select is_published,approval_status from public.quizzes where id=$1',[typedQuiz])).rows[0];
+if(unapproved.is_published||unapproved.approval_status!=='pending')throw new Error('Müəllim sınağı admin təsdiqi olmadan yayımlandı');
+await db.exec("select set_config('test.admin','true',false)");
+await db.query("select public.admin_decide_quiz($1,'published','test təsdiqi')",[typedQuiz]);
+await db.exec("select set_config('test.admin','false',false)");
+const approvedQuiz=(await db.query('select is_published,approval_status from public.quizzes where id=$1',[typedQuiz])).rows[0];
+if(!approvedQuiz.is_published||approvedQuiz.approval_status!=='published')throw new Error('Admin təsdiqi sınağı yayımlamadı');
+await db.exec("select set_config('request.jwt.claim.sub','b0000000-0000-0000-0000-00000000000b',false)");
+await db.query("insert into public.verification_requests(user_id,account_name,account_kind,work_details) values('b0000000-0000-0000-0000-00000000000b','Şagird','Tələbə','Müraciət yoxlaması üçün kifayət qədər ətraflı məlumat')");
+let directVerificationBlocked=false;try{await db.query("update public.verification_requests set status='approved' where user_id='b0000000-0000-0000-0000-00000000000b'");}catch(e){directVerificationBlocked=e.code==='42501';}
+if(!directVerificationBlocked)throw new Error('Adi istifadəçi doğrulama statusunu birbaşa dəyişə bildi');
+let adminVerificationBlocked=false;try{await db.query("select public.admin_decide_verification((select id from public.verification_requests limit 1),'approved',null)");}catch(e){adminVerificationBlocked=e.code==='P0001'||e.code==='42501';}
+if(!adminVerificationBlocked)throw new Error('Admin yoxlamasız doğrulama qərarı qəbul edildi');
+await db.exec("select set_config('test.admin','true',false)");
+await db.query("select public.admin_decide_verification((select id from public.verification_requests limit 1),'approved','Təsdiqləndi')");
+await db.query("select public.admin_set_verified('f0000000-0000-0000-0000-00000000000f',true,'Birbaşa doğrulama sınağı')");
+await db.exec("select set_config('test.admin','false',false)");
+if(!(await db.query("select is_verified from public.profiles where id='b0000000-0000-0000-0000-00000000000b'")).rows[0].is_verified||!(await db.query("select is_verified from public.profiles where id='f0000000-0000-0000-0000-00000000000f'")).rows[0].is_verified)throw new Error('Admin doğrulama təsdiqi/birbaşa nişan vermə işləmədi');
 const typedRun=(await db.query('select * from public.start_quiz_session($1)',[typedQuiz])).rows[0];
 for(const [i,a] of [[0,[0,2]],[1,'bAKi'],[2,42.3]]) await db.query('select public.save_quiz_session_answer_v2($1,$2,$3::jsonb)',[typedRun.session_id,tq.rows[i].id,JSON.stringify(a)]);
 const typedResult=(await db.query('select * from public.finish_quiz_session_v2($1)',[typedRun.session_id])).rows[0];
@@ -175,7 +195,7 @@ const nextRun=(await db.query("select * from public.start_quiz_session('c0000000
 const expired=await db.query("select status,attempt_id from public.quiz_sessions where id=$1",[stale.session_id]);
 if(!nextRun.session_id||expired.rows[0].status!=='expired'||!expired.rows[0].attempt_id)throw new Error('Müddəti bitmiş sessiya nəticəsiz itdi');
 await db.exec('reset role');
-console.log('PASS  09–13 migrations apply and re-run in isolated PostgreSQL (PGlite) stub');
+console.log('PASS  09–15 migrations apply and re-run in isolated PostgreSQL (PGlite) stub');
  console.log('PASS  quiz answers are scored server-side and session finalization is idempotent');
 console.log('PASS  quiz sessions resume, autosave answers and finalize idempotently');
 console.log('PASS  correct answers are hidden, legacy answer RPC is revoked, guest views dedupe and IP throttling is atomic');
@@ -184,4 +204,5 @@ console.log('PASS  PostgREST compatibility migration repairs reordered RPC argum
 console.log('PASS  quiz review reveals answers only after submit; expired sessions are finalized; profile stats, mention notifications and Feed report moderation work');
 console.log('PASS  quiz question types/points, teacher authoring, review-report moderation and admin broadcast work');
 console.log('PASS  14 social features re-run safely; Feed image/question/poll posting and poll votes are scoped; upload rate limit, teacher follow, projects and saved projects work');
+console.log('PASS  15 profiles add secure cover storage; quiz authoring stays pending until admin approval; verification updates require admin RPC and direct assignments work');
 await db.close();

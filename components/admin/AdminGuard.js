@@ -13,6 +13,8 @@ const TABS = [
   { href: '/admin/feed-reports', label: 'Feed şikayətləri', icon: 'flag' },
   { href: '/admin/categories', label: 'Kateqoriyalar', icon: 'folder' },
   { href: '/admin/content', label: 'Məzmun', icon: 'book' },
+  { href: '/admin/quizzes', label: 'Sınaqların təsdiqi', icon: 'quiz' },
+  { href: '/admin/verification', label: 'Mavi tık', icon: 'shield' },
   { href: '/admin/audit', label: 'Audit jurnalı', icon: 'list' },
   { href: '/admin/admins', label: 'Adminlər', icon: 'shield' }
 ];

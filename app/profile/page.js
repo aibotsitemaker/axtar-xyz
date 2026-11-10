@@ -40,11 +40,13 @@ export default function ProfilePage() {
   const [typeMsg, setTypeMsg] = useState({ type: '', text: '' });
   const [avatarBusy, setAvatarBusy] = useState(false);
   const [avatarMsg, setAvatarMsg] = useState({ type: '', text: '' });
+  const [coverBusy, setCoverBusy] = useState(false);
+  const [coverMsg, setCoverMsg] = useState({ type: '', text: '' });
 
   const load = useCallback(async () => {
     if (!user) return;
     const [p, b, f, d, a, s, v] = await Promise.all([
-      supabase.from('profiles').select('id, full_name, username, avatar_url, city, bio, created_at, account_type, is_verified').eq('id', user.id).single(),
+      supabase.from('profiles').select('id, full_name, username, avatar_url, cover_url, city, bio, created_at, account_type, is_verified').eq('id', user.id).single(),
       supabase.from('books').select('*').eq('seller_id', user.id).order('created_at', { ascending: false }),
       supabase.from('favorites').select('*, books(*), pdfs(*)').eq('user_id', user.id).order('created_at', { ascending: false }),
       supabase.from('pdfs').select('*').eq('uploader_id', user.id).order('created_at', { ascending: false }),
@@ -172,6 +174,33 @@ export default function ProfilePage() {
     setAvatarMsg({ type: 'success', text: 'Profil şəkli silindi.' });
   }
 
+  async function changeCover(event) {
+    const file = event.target.files?.[0]; event.target.value = '';
+    if (!file) return;
+    if (!['image/jpeg','image/png','image/webp'].includes(file.type) || file.size > 5 * 1024 * 1024) { setCoverMsg({type:'error',text:'JPG, PNG və ya WebP şəkli seçin (maksimum 5 MB).'}); return; }
+    try { if (typeof createImageBitmap === 'function') { const bitmap = await createImageBitmap(file); const valid = bitmap.width > 0 && bitmap.height > 0 && bitmap.width <= 10000 && bitmap.height <= 10000; bitmap.close(); if (!valid) throw new Error(); } } catch { setCoverMsg({type:'error',text:'Fayl etibarlı şəkil kimi oxunmadı.'}); return; }
+    setCoverBusy(true); setCoverMsg({type:'',text:''});
+    const {data:sessionData}=await supabase.auth.getSession();
+    if (!sessionData.session?.access_token) { setCoverBusy(false); setCoverMsg({type:'error',text:'Şəkil yükləmək üçün yenidən daxil olun.'}); return; }
+    const form=new FormData(); form.append('file',file);
+    const response=await fetch('/api/profile-cover',{method:'POST',headers:{Authorization:`Bearer ${sessionData.session.access_token}`},body:form});
+    const result=await response.json().catch(()=>({}));
+    if(!response.ok){setCoverBusy(false);setCoverMsg({type:'error',text:result.error||'Cover şəkli yüklənmədi.'});return;}
+    const previousPath=(()=>{const marker='/storage/v1/object/public/profile-covers/';try{const url=profile?.cover_url||'';const path=decodeURIComponent(url.split(marker)[1]?.split('?')[0]||'');return path.startsWith(`${user.id}/`)?path:null;}catch{return null;}})();
+    const {error}=await supabase.from('profiles').update({cover_url:result.publicUrl}).eq('id',user.id);
+    if(error){await supabase.storage.from('profile-covers').remove([result.path]);setCoverBusy(false);setCoverMsg({type:'error',text:errText(error,'Cover şəkli saxlanmadı.')});return;}
+    if(previousPath) await supabase.storage.from('profile-covers').remove([previousPath]);
+    setProfile(old=>({...old,cover_url:result.publicUrl}));setCoverBusy(false);setCoverMsg({type:'success',text:'Profil örtük şəkli yeniləndi.'});
+  }
+
+  async function removeCover() {
+    if(!profile?.cover_url||coverBusy)return;setCoverBusy(true);setCoverMsg({type:'',text:''});
+    const {error}=await supabase.from('profiles').update({cover_url:null}).eq('id',user.id);
+    if(error){setCoverBusy(false);setCoverMsg({type:'error',text:errText(error,'Cover şəklini silmək mümkün olmadı.')});return;}
+    try{const marker='/storage/v1/object/public/profile-covers/';const path=decodeURIComponent(profile.cover_url.split(marker)[1]?.split('?')[0]||'');if(path.startsWith(`${user.id}/`))await supabase.storage.from('profile-covers').remove([path]);}catch{}
+    setProfile(old=>({...old,cover_url:null}));setCoverBusy(false);setCoverMsg({type:'success',text:'Profil örtük şəkli silindi.'});
+  }
+
   async function markSold(id) { await supabase.from('books').update({ status: 'sold' }).eq('id', id); load(); }
   async function delBook(id) { if (confirm('Elan silinsin?')) { await supabase.from('books').delete().eq('id', id); load(); } }
   async function delPdf(id) { if (confirm('PDF silinsin?')) { await supabase.from('pdfs').delete().eq('id', id); load(); } }
@@ -182,7 +211,7 @@ export default function ProfilePage() {
     setDelErr('');
     setDelBusy(true);
     try {
-      for (const bucket of ['book-images', 'pdf-files', 'avatars']) {
+      for (const bucket of ['book-images', 'pdf-files', 'avatars', 'profile-covers']) {
         const { data: files } = await supabase.storage.from(bucket).list(user.id);
         if (files && files.length) await supabase.storage.from(bucket).remove(files.map((f) => `${user.id}/${f.name}`));
       }
@@ -209,19 +238,23 @@ export default function ProfilePage() {
 
   return (
     <div>
-      <div className="profile-hero card mb-6 flex flex-wrap items-center justify-between gap-4 p-5 sm:p-6">
+      <div className="profile-hero card mb-6 overflow-hidden p-0">
+        <div className="h-24 bg-gradient-to-r from-primary/20 via-indigo-100 to-sky-100 sm:h-36">{profile?.cover_url&&<img src={profile.cover_url} alt="Profil örtük şəkli" className="h-full w-full object-cover"/>}</div>
+        <div className="flex flex-wrap items-center justify-between gap-4 p-5 sm:p-6">
         <div className="flex min-w-0 items-center gap-4">
-          <div className="grid h-14 w-14 shrink-0 place-items-center overflow-hidden rounded-full bg-primary text-xl font-bold text-white">{profile?.avatar_url ? <img src={profile.avatar_url} alt="Profil şəkli" className="h-full w-full object-cover" /> : name[0].toUpperCase()}</div>
+          <div className="-mt-12 grid h-16 w-16 shrink-0 place-items-center overflow-hidden rounded-full border-4 border-surface bg-primary text-xl font-bold text-white sm:-mt-14 sm:h-20 sm:w-20">{profile?.avatar_url ? <img src={profile.avatar_url} alt="Profil şəkli" className="h-full w-full object-cover" /> : name[0].toUpperCase()}</div>
           <div className="min-w-0">
             <h1 className="truncate text-xl font-bold tracking-tight">{profile?.full_name || 'İstifadəçi'}</h1>
             <p className="truncate text-sm text-muted">{user.email}</p>
-            {profile?.account_type && <p className="mt-1"><AccountBadge type={profile.account_type} /></p>}
+          {profile?.is_verified && <p className="mt-1"><span className="verified-mark" aria-label="Doğrulanmış hesab">✓</span> Doğrulanmış hesab</p>}
+          {profile?.account_type && <p className="mt-1"><AccountBadge type={profile.account_type} /></p>}
           </div>
         </div>
         <div className="flex gap-2">
           <Link href="/forum" className="btn btn-secondary btn-sm"><Icon name="message" className="h-4 w-4" />Forum</Link>
           <Link href="/chat" className="btn btn-secondary btn-sm"><Icon name="chat" className="h-4 w-4" />Mesajlar</Link>
           <button onClick={logout} className="btn btn-secondary btn-sm"><Icon name="logout" className="h-4 w-4" />Çıxış</button>
+        </div>
         </div>
       </div>
 
@@ -315,6 +348,13 @@ export default function ProfilePage() {
 
       {tab === 'settings' && (
         <div className="max-w-lg space-y-6">
+          <section className="card space-y-3 p-5 sm:p-6" aria-labelledby="cover-title">
+            <h2 id="cover-title" className="text-lg font-semibold">Profil örtük şəkli</h2>
+            <div className="relative h-28 overflow-hidden rounded-2xl bg-gradient-to-r from-primary/20 via-indigo-100 to-sky-100 sm:h-40">{profile?.cover_url&&<img src={profile.cover_url} alt="Profil örtük şəkli" className="h-full w-full object-cover"/>}</div>
+            <p className="text-sm text-muted">JPG, PNG və WebP · maksimum 5 MB.</p>
+            <div className="flex flex-wrap gap-2"><label className="btn btn-secondary cursor-pointer">{coverBusy?<Spinner/>:<Icon name="upload" className="h-4 w-4"/>}Şəkil seç<input type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" disabled={coverBusy} onChange={changeCover}/></label>{profile?.cover_url&&<button type="button" className="btn btn-danger" disabled={coverBusy} onClick={removeCover}>Şəkli sil</button>}</div>
+            {coverMsg.text&&<Alert type={coverMsg.type}>{coverMsg.text}</Alert>}
+          </section>
           <section className="card space-y-3 p-5 sm:p-6" aria-labelledby="avatar-title">
             <h2 id="avatar-title" className="text-lg font-semibold">Profil şəkli</h2>
             <p className="text-sm text-muted">JPG, PNG və WebP qəbul edilir. Maksimum ölçü 2 MB-dır.</p>

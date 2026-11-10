@@ -31,7 +31,7 @@ export default function PublicProfilePage() {
     if (!id) return undefined;
     let stop = false;
     Promise.all([
-      supabase.from('profiles').select('id, full_name, username, avatar_url, city, bio, account_type, created_at, is_verified').eq('id', id).maybeSingle(),
+      supabase.from('profiles').select('id, full_name, username, avatar_url, cover_url, city, bio, account_type, created_at, is_verified').eq('id', id).maybeSingle(),
       supabase.from('forum_topics').select('id, title, category_id, reply_count, last_activity_at, created_at', { count: 'exact' })
         .eq('author_id', id).eq('status', 'active').order('created_at', { ascending: false }).limit(20),
       supabase.from('forum_replies').select('id', { count: 'exact', head: true }).eq('author_id', id).eq('status', 'active'),
@@ -74,9 +74,11 @@ export default function PublicProfilePage() {
     <div className="mx-auto max-w-3xl">
       <Link href="/forum" className="mb-4 inline-flex items-center gap-1.5 text-sm font-medium text-muted hover:text-primary"><Icon name="arrowLeft" className="h-4 w-4" />Foruma qayıt</Link>
 
-      <section className="teacher-profile-hero card p-5 sm:p-7" aria-labelledby="u-name">
-        <div className="flex items-start gap-4 sm:gap-5">
-          <div className="teacher-profile-avatar grid h-20 w-20 shrink-0 place-items-center overflow-hidden rounded-full bg-primary text-2xl font-bold text-white sm:h-24 sm:w-24" aria-hidden="true">{profile.avatar_url ? <img src={profile.avatar_url} alt="" className="h-full w-full object-cover" /> : name[0].toUpperCase()}</div>
+      <section className="teacher-profile-hero card overflow-hidden p-0" aria-labelledby="u-name">
+        <div className="h-32 bg-gradient-to-r from-primary/20 via-indigo-100 to-sky-100 sm:h-48">{profile.cover_url&&<img src={profile.cover_url} alt="Profil örtük şəkli" className="h-full w-full object-cover"/>}</div>
+        <div className="px-5 pb-5 sm:px-7 sm:pb-7">
+        <div className="-mt-10 flex items-end gap-4 sm:-mt-14 sm:gap-5">
+          <div className="teacher-profile-avatar grid h-20 w-20 shrink-0 place-items-center overflow-hidden rounded-full bg-primary text-2xl font-bold text-white sm:h-28 sm:w-28" aria-hidden="true">{profile.avatar_url ? <img src={profile.avatar_url} alt="" className="h-full w-full object-cover" /> : name[0].toUpperCase()}</div>
           <div className="min-w-0">
             <h1 id="u-name" className="break-words text-xl font-bold tracking-tight sm:text-2xl">{name} {profile.is_verified&&<span className="text-blue-500" title="TəhsilHub tərəfindən doğrulanıb" aria-label="Doğrulanmış hesab">✓</span>}</h1>
             <p className="mt-1.5 flex flex-wrap items-center gap-2 text-sm text-muted">
@@ -97,6 +99,7 @@ export default function PublicProfilePage() {
           <div className="rounded-lg bg-canvas px-3 py-2"><dt className="text-xs text-muted">Ümumi baxış</dt><dd className="text-lg font-bold">{profileStats.total_views||0}</dd></div>
           {profile.account_type==='teacher'&&<div className="rounded-lg bg-canvas px-3 py-2"><dt className="text-xs text-muted">Orta rəy</dt><dd className="text-lg font-bold">★ {profileStats.avg_rating||'0.00'} · {profileStats.review_count||0}</dd></div>}
         </dl>
+        </div>
       </section>
 
       <section className="mt-8" aria-labelledby="u-feed"><div className="mb-3 flex items-end justify-between gap-3"><div><h2 id="u-feed" className="text-lg font-bold">Paylaşımlar</h2><p className="mt-1 text-sm text-muted">TəhsilHub Feed-də paylaşdığı fikirlər</p></div><Link href="/feed" className="text-sm font-semibold text-primary">Feed-ə keç</Link></div>

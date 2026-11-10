@@ -75,7 +75,7 @@ export function CreateForm({ onClose, onCreated }) {
     setBusy(false);
     lock.current = false;
     if (error) { setErr(errText(error)); return; }
-    onCreated('Sınaq qaralama kimi yaradıldı. Müəllim sınaqlarında onu ayrıca dərc edin.');
+    onCreated('Sınaq yaradıldı və admin təsdiqinə göndərildi.');
   }
 
   return (

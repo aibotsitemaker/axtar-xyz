@@ -1,5 +1,11 @@
 # Dəyişikliklər
 
+## v6.8
+- Profil örtük şəkli yükləmə, dəyişmə və silmə; profil başlıqlarında cover + avatar düzülüşü və mobil uyğun görünüş.
+- Müəllim sınaqları `pending` vəziyyətində yaranır; admin üçün ayrıca tam sual/cavab yoxlama, təsdiq, rədd və silmə səhifəsi yaradıldı.
+- Doğrulama müraciəti qərarları admin RPC-lərindən keçir; mavi tıkı birbaşa vermək/götürmək, siyahılara baxmaq, admin audit qeydi əlavə edildi.
+- Yeni additive `15_social_profiles_moderation_verification.sql` migration və DB sınaqları.
+
 ## v6.0
 - Yeni `/feed` mətnli sosial səhifəsi: paylaşım, like, şərh, müəllif profili, təhlükəsiz URL linkləri.
 - Additive `09_social_trust_views.sql`: Feed, rəy, doğrulama müraciəti və rate-limited view event sxemləri/RLS.
