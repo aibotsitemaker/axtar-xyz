@@ -202,7 +202,7 @@ export default function BooksPage() {
                             <span className="truncate text-xs text-muted">{b.profiles?.full_name}</span>
                           </div>
                           <div className="mt-3 grid grid-cols-2 gap-2">
-                            <button onClick={() => openChat(b)} className="btn btn-primary btn-sm"><Icon name="chat" className="h-4 w-4" />Çat</button>
+                            <button onClick={() => openChat(b)} className="btn btn-primary btn-sm"><Icon name="chat" className="h-4 w-4" />Satıcıya yaz</button>
                             <button onClick={() => openWhatsApp(b)} disabled={!b.whatsapp} className="btn btn-secondary btn-sm">WhatsApp</button>
                           </div>
                         </div>

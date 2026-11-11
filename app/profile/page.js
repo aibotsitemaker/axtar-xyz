@@ -252,7 +252,7 @@ export default function ProfilePage() {
         </div>
         <div className="flex gap-2">
           <Link href="/forum" className="btn btn-secondary btn-sm"><Icon name="message" className="h-4 w-4" />Forum</Link>
-          <Link href="/chat" className="btn btn-secondary btn-sm"><Icon name="chat" className="h-4 w-4" />Mesajlar</Link>
+          <Link href="/chat" className="btn btn-secondary btn-sm"><Icon name="chat" className="h-4 w-4" />Şəxsi mesajlar</Link>
           <button onClick={logout} className="btn btn-secondary btn-sm"><Icon name="logout" className="h-4 w-4" />Çıxış</button>
         </div>
         </div>

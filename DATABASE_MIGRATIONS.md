@@ -57,3 +57,7 @@ v6.7 bazası üçün backup aldıqdan sonra yalnız `15_social_profiles_moderati
 - Doğrulama cədvəlində adi istifadəçinin status yeniləmə icazəsi ləğv olunur. Müraciət yaratmaq və öz müraciətini oxumaq əvvəlki kimi qalır.
 
 Yeni quraşdırmada sıra 01–08 (mövcud deploy təlimatına uyğun), 09, 10, 11, 12, 13, 14, 15-dir. Mövcud DB-də 00–14 artıq tətbiq olunubsa, yalnız 15-i işlədin. 06–08-i yenidən icra etməyin. Migration 15 PGlite PostgreSQL mühitində iki dəfə tətbiq etmə, quiz təsdiq axını və doğrulama icazələri ilə yoxlanıb; canlı Supabase DB-də icra edilməyib.
+
+## v6.9 — müzakirə otaqları
+
+v6.8 bazası üçün backup aldıqdan sonra yalnız `16_discussion_rooms.sql` faylını Supabase SQL Editor-də icra edin. Bu additive migration otaq kataloqunu, otaq üzvlüyünü, mesaj tarixçəsini, RLS qaydalarını və join/leave/send/list RPC-lərini yaradır; mövcud `conversations`/şəxsi mesaj cədvəllərini və istifadəçi məlumatlarını silmir. Otaq mesajlarının oxunuşu və göndərişi üzvlüklə məhdudlaşdırılıb; mesaj göndərmə RPC-si authenticated sessiya və rate limit yoxlaması tətbiq edir. Migration PGlite-də iki dəfə tətbiq və üzv/üzv olmayan sınaqları ilə yoxlanıb, amma canlı Supabase DB-də icra edilməyib. Yeni quraşdırma üçün sıra 01–08, sonra 09–16-dır.

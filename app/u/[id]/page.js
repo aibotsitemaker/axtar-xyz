@@ -1,11 +1,11 @@
 'use client';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { supabase } from '../../../lib/supabase';
 import Icon from '../../../components/Icons';
 import AccountBadge from '../../../components/AccountBadge';
-import { Alert, EmptyState, ListSkeleton } from '../../../components/ui';
+import { Alert, EmptyState, ListSkeleton, Spinner } from '../../../components/ui';
 import { isUuid, loadCategories } from '../../../lib/forum';
 import { fmtDate, timeAgo } from '../../../lib/format';
 import { useAuth } from '../../../components/AuthProvider';
@@ -15,6 +15,7 @@ import TeacherFollowButton from '../../../components/TeacherFollowButton';
 // İctimai profil: yalnız ad, hesab tipi, şəhər, haqqında və forum fəaliyyəti. E-poçt və digər şəxsi məlumat göstərilmir.
 export default function PublicProfilePage() {
   const params = useParams();
+  const router = useRouter();
   const raw = Array.isArray(params?.id) ? params.id[0] : params?.id;
   const id = isUuid(raw) ? raw : '';
   const [state, setState] = useState('loading'); // loading | ready | missing | error
@@ -26,6 +27,7 @@ export default function PublicProfilePage() {
   const [cats, setCats] = useState({});
   const { user } = useAuth();
   const [reviews,setReviews]=useState([]); const [reviewSort,setReviewSort]=useState('newest'); const [rating,setRating]=useState(5); const [reportId,setReportId]=useState(''); const [reportReason,setReportReason]=useState('other'); const [reportMsg,setReportMsg]=useState(''); const [reviewBody,setReviewBody]=useState(''); const [reviewMsg,setReviewMsg]=useState(''); const [reviewBusy,setReviewBusy]=useState(false); const [ratingSummary,setRatingSummary]=useState({avg_rating:0,review_count:0}); const [profileStats,setProfileStats]=useState({});
+  const [messageBusy,setMessageBusy]=useState(false);const [messageError,setMessageError]=useState('');
 
   useEffect(() => {
     if (!id) return undefined;
@@ -61,6 +63,7 @@ export default function PublicProfilePage() {
 
   async function submitReview(e){e.preventDefault();if(!user)return;setReviewBusy(true);setReviewMsg('');const {error}=await supabase.from('teacher_reviews').insert({teacher_id:id,author_id:user.id,rating:Number(rating),body:reviewBody.trim()});setReviewBusy(false);if(error)setReviewMsg(error.code==='23505'?'Bu müəllimə artıq rəy yazmısınız.':error.message);else{setReviewBody('');setReviewMsg('Rəyiniz dərc edildi.');const [{data:rv},{data:rs}]=await Promise.all([supabase.from('teacher_reviews').select('id,author_id,rating,body,created_at,profiles!teacher_reviews_author_id_fkey(full_name)').eq('teacher_id',id).eq('status','active').order('created_at',{ascending:false}).limit(50),supabase.rpc('review_rating_summary',{p_teacher:id})]);setReviews(rv||[]);setRatingSummary(rs?.[0]||{avg_rating:0,review_count:0});}}
   async function reportReview(reviewId){if(!user)return;const {error}=await supabase.from('teacher_review_reports').insert({review_id:reviewId,reporter_id:user.id,reason:reportReason,details:null});if(error)setReportMsg(error.code==='23505'?'Bu rəy üçün artıq şikayət etmisiniz.':error.message);else{setReportMsg('Şikayətiniz moderatorlara göndərildi.');setReportId('');}}
+  async function startMessage(){if(!user){router.push(`/auth?next=${encodeURIComponent(`/u/${id}`)}`);return;}if(user.id===id)return;setMessageBusy(true);setMessageError('');const {data,error}=await supabase.rpc('get_or_create_conversation',{p_other_user:id,p_book_id:null});setMessageBusy(false);if(error||!data){setMessageError(error?.message||'Şəxsi mesajlaşmanı başlatmaq mümkün olmadı.');return;}router.push(`/chat?c=${encodeURIComponent(data)}`);}
 
   if (!id || state === 'missing') {
     return <EmptyState icon="user" title="İstifadəçi tapılmadı" text="Profil mövcud deyil və ya silinib." action={<Link href="/forum" className="btn btn-primary">Foruma qayıt</Link>} />;
@@ -84,6 +87,7 @@ export default function PublicProfilePage() {
             <p className="mt-1.5 flex flex-wrap items-center gap-2 text-sm text-muted">
               <AccountBadge type={profile.account_type} />
               {profile.account_type==='teacher'&&<TeacherFollowButton teacherId={id}/>}
+              {user?.id!==id&&<button type="button" onClick={startMessage} disabled={messageBusy} className="btn btn-primary btn-sm">{messageBusy?<Spinner/>:<Icon name="chat" className="h-4 w-4"/>}Mesaj yaz</button>}
               {profile.city && <span className="inline-flex items-center gap-1"><Icon name="pin" className="h-3.5 w-3.5" />{profile.city}</span>}
               <span>Qeydiyyat: {fmtDate(profile.created_at)}</span>
               {profile.account_type==='teacher'&&<SaveContentButton type="teacher_profile" id={id}/>}
@@ -99,6 +103,7 @@ export default function PublicProfilePage() {
           <div className="rounded-lg bg-canvas px-3 py-2"><dt className="text-xs text-muted">Ümumi baxış</dt><dd className="text-lg font-bold">{profileStats.total_views||0}</dd></div>
           {profile.account_type==='teacher'&&<div className="rounded-lg bg-canvas px-3 py-2"><dt className="text-xs text-muted">Orta rəy</dt><dd className="text-lg font-bold">★ {profileStats.avg_rating||'0.00'} · {profileStats.review_count||0}</dd></div>}
         </dl>
+        {messageError&&<Alert type="error" className="mt-4">{messageError}</Alert>}
         </div>
       </section>
 

@@ -1,4 +1,4 @@
-# TEST_REPORT — TəhsilHub v6.8
+# TEST_REPORT — TəhsilHub v6.9
 
 Bu hesabat v6.3–v6.5 yoxlama tarixçəsini saxlayır; cari dizayn buraxılışı və son yoxlamalar v6.6 bölməsindədir.
 
@@ -108,3 +108,14 @@ Son yekun production build: `npm run build -- --webpack` uğurla keçdi; TypeScr
 - `npm test --prefix tests/db` uğurla keçdi: 75 schema/security testi, 42 loyiha və workflow yoxlaması. PGlite-də 09–15 migration-lar iki dəfə tətbiq olundu. Yeni assertions quiz pending → admin published axınını, doğrulama statusunun adi istifadəçi update-i ilə dəyişmədiyini, müraciət təsdiqini və birbaşa verified grant-ı yoxladı.
 - `npm run lint -- --quiet` uğurla keçdi. `npm run build -- --webpack` uğurla keçdi; 39/39 statik səhifə yaradıldı, `/admin/quizzes` və `/api/profile-cover` build nəticəsində mövcuddur.
 - Browser screenshot və real Supabase layihəsində axın sınağı bu mühitdə mümkün olmadı (browser səthi və Supabase credentials qoşulu deyil). DB təhlükəsizlik davranışı PGlite-də, frontend route/build/Lint isə lokal layihədə yoxlanıb. Canlı DB-yə heç bir SQL tətbiq edilməyib; deploydan əvvəl backup alıb yalnız migration 15-i icra edin.
+
+## v6.9 — Feed 500 kök səbəbi, DM və müzakirə otaqları (2026-11-12)
+
+- **Təsdiqlənən 500 kök səbəbi:** Feed-də `FeedMedia` `safeUrl(...)` funksiyasını çağırırdı, amma funksiya müəyyən edilməmişdi. Şəkilli post render olunanda yaranan `ReferenceError` səhifənin error boundary-sinə çatıb bütöv Ana səhifəni 500 görünüşünə keçirirdi. Bu səbəb lokal Supabase mock-la işləyən Chromium brauzerində təkrarlandı və URL protokolunu HTTP(S) ilə məhdudlaşdıran köməkçi əlavə edildikdən sonra aradan qalxdı. Buna görə bütün istifadəçilər də eyni səhifə komponentində eyni render xətasına düşə bilərdi.
+- Postun səhv media məlumatı ayrıca idarə olunur: media yolu UUID sahib qovluğu və təhlükəsiz fayl adı ilə yoxlanır; Storage URL exception/etibarsız dəyər qorunur; qırıq şəkil həmin paylaşımın yerli placeholder-ına çevrilir. Feed əsas post query-sini profil/bəyənmə/şərh sidecar query-lərindən ayırır və zəngin query uğursuz olduqda mətn üçün minimal fallback istifadə edir. Mövcud post və media məlumatları silinməyib.
+- İctimai profilə **Mesaj yaz** düyməsi mövcud `get_or_create_conversation` RPC-sindən istifadə edir; auth yoxdursa girişə yönləndirir. Şəxsi söhbətin DB RLS/RPC mexanizmi saxlanıb.
+- Yeni **Müzakirə otaqları** səhifəsi və `16_discussion_rooms.sql` otaq üzvlüyünü, mesaj tarixçəsini, RLS-i, üzv yoxlamasını və göndəriş rate limitini əlavə edir. Köhnə şəxsi mesaj bölməsi ayrıca **Şəxsi mesajlar** kimi saxlanıb. Otaq cədvəlləri ilə legacy şəxsi söhbət cədvəlləri ayrıdır.
+- `npm test --prefix tests/db`: 75 schema/security testi, 42 layihə testi, migration 09–16 təkrar tətbiqi, text/image post, zədələnmiş media normallaşdırması, otağa qoşulma/göndəriş və üzv olmayanın oxu/göndəriş qadağası uğurla keçdi.
+- `npm run lint -- --quiet` uğurla keçdi (0 xəta); `npm run build -- --webpack` uğurla keçdi (webpack compile, TypeScript, 40/40 statik səhifə, build trace).
+- `tests/browser/smoke-v69.mjs` quraşdırılmış Chrome ilə uğurla keçdi: desktop və mobil Feed overflow yoxlaması; mətnli, şəkilli və zədələnmiş-media postlarının hamısının görünməsi; test şəkilinin yüklənib paylaşılması; profil mesajı düyməsinin söhbətə yönləndirməsi; müzakirə otağı səhifəsi. Testlər lokal Supabase mock istifadə edir.
+- **Canlı mühit məhdudiyyəti:** canlı Supabase layihəsinin loglarına/DB-sinə credentials olmadığı üçün bağlanılmayıb; konkret istifadəçi postunun row ID-si və Storage obyektinin mövcudluğu prod DB-dən yoxlanmayıb. Kodda sübut olunan render crash-in kök səbəbi isə düzəldilib. Deployment üçün v6.8 DB-yə backup-dan sonra migration 16-nı tətbiq edin; canlı image Storage policy və API davranışını deploydan sonra real layihədə smoke test edin.

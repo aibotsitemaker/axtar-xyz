@@ -1,5 +1,12 @@
 # Dəyişikliklər
 
+## v6.9 — Feed media xətasının izolyasiyası və müzakirə otaqları
+- Feed media render-ində çatışmayan URL qoruyucusu bütöv Ana səhifəni error boundary-yə salırdı; HTTP(S) URL yoxlaması əlavə edildi və kök səbəb real Chromium testində təsdiqlənərək aradan qaldırıldı.
+- Feed yüklənməsi post sorğusunu profil/bəyənmə/şərh məlumatlarından ayırır; zəngin projection uğursuz olduqda mətnli təhlükəsiz fallback var. Zədələnmiş və ya etibarsız media yalnız həmin postda əlçatmaz şəkil vəziyyəti göstərir.
+- İctimai profildə **Mesaj yaz** düyməsi mövcud, icazəli şəxsi söhbət yaratma RPC-sinə yönləndirir.
+- Təhsil mövzulu, qoşulma və üzv yoxlamalı **Müzakirə otaqları** bölməsi, mesajlaşma və yeni additive `16_discussion_rooms.sql` migration-ı əlavə olundu. Mövcud şəxsi mesajlaşma saxlanıldı.
+- `tests/browser/smoke-v69.mjs` desktop/mobil Feed-i, text/image/damaged-media postlarını, şəkil paylaşma axınını, profil mesajını və otaqları Chromium-da yoxlayır.
+
 ## v6.8
 - Profil örtük şəkli yükləmə, dəyişmə və silmə; profil başlıqlarında cover + avatar düzülüşü və mobil uyğun görünüş.
 - Müəllim sınaqları `pending` vəziyyətində yaranır; admin üçün ayrıca tam sual/cavab yoxlama, təsdiq, rədd və silmə səhifəsi yaradıldı.

@@ -75,13 +75,13 @@ function ChatInner() {
   }
 
   if (loading) return <div className="skeleton h-96" aria-busy="true" />;
-  if (!user) return <LoginPrompt text="Çatdan istifadə üçün daxil olun." />;
+  if (!user) return <LoginPrompt text="Şəxsi mesajlarınıza baxmaq üçün daxil olun." />;
 
   const current = convs.find((c) => c.id === active);
 
   return (
     <div>
-      <div className={active ? 'hidden md:block' : ''}><PageHeader title="Mesajlar" subtitle="Satıcılar və digər istifadəçilərlə söhbətlər" /></div>
+      <div className={active ? 'hidden md:block' : ''}><PageHeader title="Şəxsi mesajlar" subtitle="İstifadəçilərlə şəxsi yazışmalarınız" /></div>
       <div className="card flex h-[calc(100dvh-10.5rem)] min-h-[440px] overflow-hidden md:h-[calc(100dvh-14rem)]">
         <aside className={`${active ? 'hidden md:flex' : 'flex'} w-full flex-col border-r border-line md:w-80`}>
           <div className="border-b border-line px-4 py-3 text-sm font-semibold">Söhbətlər</div>
@@ -90,7 +90,7 @@ function ChatInner() {
               <div className="p-8 text-center">
                 <div className="mx-auto mb-3 grid h-11 w-11 place-items-center rounded-full bg-primary-soft text-primary"><Icon name="chat" className="h-5 w-5" /></div>
                 <p className="text-sm font-medium">Hələ söhbət yoxdur</p>
-                <p className="mt-1 text-xs text-muted">Kitab elanından “Çat” düyməsini sıxın.</p>
+                <p className="mt-1 text-xs text-muted">İstifadəçi profilindən “Mesaj yaz” seçərək şəxsi yazışma başladın.</p>
               </div>
             )}
             {convs.map((c) => (
